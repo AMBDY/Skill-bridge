@@ -1,4 +1,46 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  let uploadedReferenceImages = [];
+
+const referenceDropZone = document.getElementById('referenceDropZone');
+const referenceFileInput = document.getElementById('referenceFileInput');
+const referencePreview = document.getElementById('referencePreview');
+
+if (referenceDropZone && referenceFileInput) {
+  referenceDropZone.addEventListener('click', () => referenceFileInput.click());
+
+  referenceFileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        Toast.show('Only image files are allowed');
+        continue;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        Toast.show(file.name + ' is larger than 5MB');
+        continue;
+      }
+
+      try {
+        Toast.show('Uploading ' + file.name + '...');
+        const url = await uploadImage(file, 'job-references');
+        uploadedReferenceImages.push(url);
+
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.width = '84px';
+        img.style.height = '84px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '8px';
+        img.style.border = '1px solid var(--border)';
+        referencePreview.appendChild(img);
+      } catch (err) {
+        Toast.show('Upload failed: ' + err.message);
+      }
+    }
+  });
+}
   const catSel = document.getElementById('catSel');
   const form = document.getElementById('postJobForm');
 
@@ -44,14 +86,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      if (data.reference_images) {
-        data.reference_images = data.reference_images
-          .split(',')
-          .map(x => x.trim())
-          .filter(Boolean);
-      } else {
-        data.reference_images = [];
-      }
+      const typedReferenceImages = data.reference_images
+        ? data.reference_images.split(',').map(x => x.trim()).filter(Boolean)
+        : [];
+
+      data.reference_images = [
+        ...typedReferenceImages,
+        ...uploadedReferenceImages
+      ];
 
       data.budget = Number(data.budget || 0);
       data.price_min = data.price_min ? Number(data.price_min) : null;
