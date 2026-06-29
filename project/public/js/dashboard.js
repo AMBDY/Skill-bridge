@@ -1,65 +1,264 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!Auth.isLoggedIn()) { location.href = '/signin.html'; return; }
+  if (!Auth.isLoggedIn()) {
+    location.href = '/signin.html';
+    return;
+  }
+
   const main = document.getElementById('dashMain');
   const user = Auth.user();
-  main.innerHTML = `
-    <h1 class="section-title">Welcome, ${user?.display_name || 'User'}</h1>
-    <p class="section-sub">Role: ${user?.role} • Tier: ${user?.subscription_tier || 'free'} • KYC: L${user?.kyc_level || 0}</p>
 
-    <div class="grid grid-4" style="margin:24px 0">
-      <a href="/post-job.html" class="stat-card"><div class="stat-num">+</div><div class="stat-label">Post a Job</div></a>
-      <a href="/chat.html" class="stat-card"><div class="stat-num">💬</div><div class="stat-label">Messages</div></a>
-      <a href="/payments.html" class="stat-card"><div class="stat-num">💳</div><div class="stat-label">Payments</div></a>
-      <a href="/profile.html?id=${user?.user_id}" class="stat-card"><div class="stat-num">👤</div><div class="stat-label">My Profile</div></a>
-    </div>
+  main.innerHTML = '<div class="skeleton" style="height:160px"></div>';
 
-    <h2 style="font-size:1.6rem;margin:24px 0 16px">Subscription</h2>
-    <div class="grid grid-4">
-      ${['free','pro','featured','elite'].map(t => `
-        <div class="card ${user?.subscription_tier === t ? '' : ''}"><div class="card-body">
-          <h3 style="text-transform:capitalize;font-size:1.3rem">${t}</h3>
-          <p style="color:var(--text-soft);font-size:0.85rem;min-height:48px">${{free:'Standard listing',pro:'Increased visibility',featured:'Homepage + search boost',elite:'Top ranking + AI boost'}[t]}</p>
-          <button class="btn ${user?.subscription_tier === t ? 'btn-outline' : 'btn-gold'} btn-block btn-sm" onclick="requestSub('${t}')">${user?.subscription_tier === t ? 'Current' : 'Upgrade'}</button>
-        </div></div>`).join('')}
-    </div>
+  const summary = await API.get('/marketplace/me/summary').catch(() => ({
+    role: user?.role,
+    jobsCreated: [],
+    bids: [],
+    products: [],
+    services: [],
+    ordersAsSeller: [],
+    ordersAsBuyer: [],
+    withdrawals: [],
+    notifications: [],
+    reviews: [],
+    availableJobs: []
+  }));
 
-    <h2 style="font-size:1.6rem;margin:32px 0 16px">My Jobs</h2>
-    <div id="myJobs"></div>
+  const role = user?.role || summary.role || 'client';
 
-    <h2 style="font-size:1.6rem;margin:32px 0 16px">My Payments</h2>
-    <div id="myPayments"></div>
-  `;
+  if (role === 'client') return renderClient(main, user, summary);
+  if (role === 'freelancer') return renderFreelancer(main, user, summary);
+  if (role === 'worker') return renderWorker(main, user, summary);
+  if (role === 'seller') return renderSeller(main, user, summary);
+  if (role === 'admin') return renderAdmin(main, user, summary);
 
-  const [jobs, payments] = await Promise.all([
-    API.get('/jobs').catch(() => []),
-    API.get('/payments').catch(() => [])
-  ]);
-  const myJobs = jobs.filter(j => j.user_id === user?.user_id || j.assigned_to === user?.user_id);
-  document.getElementById('myJobs').innerHTML = myJobs.length ? myJobs.map(j => `
-    <div class="card" style="margin-bottom:10px"><div class="card-body" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div><a href="/job.html?id=${j.id}" style="font-weight:500">${j.title}</a><div class="card-meta"><span>${j.status}</span><span>•</span><span>${fmtPrice(j.budget || 0)}</span></div></div>
-      <span class="badge badge-kyc">${j.status}</span>
-    </div></div>`).join('') : '<p style="color:var(--text-muted)">No jobs yet.</p>';
-
-  document.getElementById('myPayments').innerHTML = payments.length ? payments.map(p => `
-    <div class="card" style="margin-bottom:10px"><div class="card-body" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div><div style="font-weight:500">${p.job?.title || 'Payment'}</div><div class="card-meta"><span>${fmtPrice(p.amount)}</span><span>•</span><span>${p.status}</span><span>•</span><span>${p.payment_method}</span></div></div>
-      ${p.status === 'in_escrow' && p.client_id === user?.user_id ? `<button class="btn btn-gold btn-sm" onclick="markReceived('${p.id}')">Mark Received</button>` : ''}
-    </div></div>`).join('') : '<p style="color:var(--text-muted)">No payments yet.</p>';
+  renderClient(main, user, summary);
 });
 
-window.requestSub = async function (tier) {
-  if (tier === 'free') return Toast.show('You are on the free tier');
-  try {
-    await API.post('/marketplace/subscriptions', { tier, amount: { pro: 5000, featured: 15000, elite: 30000 }[tier] || 0 });
-    Toast.show('Subscription request sent for admin approval');
-  } catch (e) { Toast.show(e.message); }
-};
+function dashboardHeader(user, title) {
+  return `
+    <h1 class="section-title">${title}</h1>
+    <p class="section-sub">
+      ${user?.display_name || 'User'} | ${user?.role || ''}
+      | Tier: ${user?.subscription_tier || 'free'} | KYC: L${user?.kyc_level || 0}
+    </p>
+  `;
+}
 
-window.markReceived = async function (id) {
-  try {
-    await API.put(`/payments/${id}/received`);
-    Toast.show('Marked as received! Admin will release funds.');
-    setTimeout(() => location.reload(), 1000);
-  } catch (e) { Toast.show(e.message); }
-};
+function statCard(label, value, href) {
+  const content = `<div class="stat-num">${value}</div><div class="stat-label">${label}</div>`;
+  return href
+    ? `<a href="${href}" class="stat-card">${content}</a>`
+    : `<div class="stat-card">${content}</div>`;
+}
+
+function rows(items, emptyText, mapper) {
+  if (!items || !items.length) return `<p style="color:var(--text-muted)">${emptyText}</p>`;
+  return items.map(mapper).join('');
+}
+
+function jobRow(j) {
+  return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <a href="/job.html?id=${j.id}" style="font-weight:600">${j.title}</a>
+          <div class="card-meta">
+            <span>${j.status}</span><span>|</span>
+            <span>${j.job_type || 'remote'}</span><span>|</span>
+            <span>${j.location || j.state || 'Nigeria'}</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="card-price">${fmtPrice(j.budget || j.price_max || 0)}</div>
+          <a href="/job.html?id=${j.id}" class="btn btn-outline btn-sm">View</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function bidRow(b) {
+  return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600">Job Application</div>
+          <div class="card-meta">
+            <span>${b.status}</span><span>|</span><span>${b.duration || 'Flexible'}</span>
+          </div>
+        </div>
+        <div class="card-price">${fmtPrice(b.amount || 0)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function productRow(p) {
+  return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <a href="/listing.html?type=product&id=${p.id}" style="font-weight:600">${p.title}</a>
+          <div class="card-meta">
+            <span>${p.status}</span><span>|</span><span>Stock: ${p.stock || 0}</span>
+          </div>
+        </div>
+        <div class="card-price">${fmtPrice(p.price || 0)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function serviceRow(s) {
+  return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <a href="/listing.html?type=service&id=${s.id}" style="font-weight:600">${s.title}</a>
+          <div class="card-meta">
+            <span>${s.status}</span><span>|</span><span>${s.delivery_days || 7} days</span>
+          </div>
+        </div>
+        <div class="card-price">${fmtPrice(s.price || 0)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function withdrawalRows(items) {
+  return rows(items, 'No withdrawals yet.', w => `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <strong>${fmtPrice(w.amount)}</strong>
+          <div class="card-meta">${w.bank_name || ''} ${w.account_number || ''}</div>
+        </div>
+        <span class="badge badge-kyc">${w.status}</span>
+      </div>
+    </div>
+  `);
+}
+
+function renderClient(main, user, summary) {
+  main.innerHTML = `
+    ${dashboardHeader(user, 'Client Dashboard')}
+
+    <div class="grid grid-4" style="margin:24px 0">
+      ${statCard('Post a Job', '+', '/post-job.html')}
+      ${statCard('My Jobs', summary.jobsCreated.length)}
+      ${statCard('Messages', summary.notifications.filter(n => !n.read).length, '/chat.html')}
+      ${statCard('My Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
+    </div>
+
+    <h2 style="font-size:1.4rem;margin:24px 0 14px">My Posted Jobs</h2>
+    ${rows(summary.jobsCreated, 'No jobs posted yet.', jobRow)}
+
+    <h2 style="font-size:1.4rem;margin:24px 0 14px">Orders And Purchases</h2>
+    ${rows(summary.ordersAsBuyer, 'No purchases yet.', o => `
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-body">${fmtPrice(o.amount)} - ${o.status}</div>
+      </div>
+    `)}
+  `;
+}
+
+function renderFreelancer(main, user, summary) {
+  main.innerHTML = `
+    ${dashboardHeader(user, 'Freelancer Dashboard')}
+
+    <div class="grid grid-4" style="margin:24px 0">
+      ${statCard('New Jobs', summary.availableJobs.length, '/jobs.html')}
+      ${statCard('Jobs Applied', summary.bids.length)}
+      ${statCard('Unread Messages', summary.notifications.filter(n => !n.read).length, '/chat.html')}
+      ${statCard('Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">Recommended Jobs</h2>
+        ${rows(summary.availableJobs, 'No new jobs available.', jobRow)}
+      </div>
+
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">My Applications</h2>
+        ${rows(summary.bids, 'No applications yet.', bidRow)}
+
+        <h2 style="font-size:1.4rem;margin:24px 0 14px">Withdrawals</h2>
+        ${withdrawalRows(summary.withdrawals)}
+      </div>
+    </div>
+  `;
+}
+
+function renderWorker(main, user, summary) {
+  main.innerHTML = `
+    ${dashboardHeader(user, 'Worker Dashboard')}
+
+    <div class="grid grid-4" style="margin:24px 0">
+      ${statCard('Available Jobs', summary.availableJobs.length, '/jobs.html')}
+      ${statCard('Jobs Applied', summary.bids.length)}
+      ${statCard('My Services', summary.services.length)}
+      ${statCard('KYC Status', `L${user?.kyc_level || 0}`)}
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">Available Jobs</h2>
+        ${rows(summary.availableJobs, 'No jobs available.', jobRow)}
+      </div>
+
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">My Service Listings</h2>
+        ${rows(summary.services, 'No services listed yet.', serviceRow)}
+
+        <h2 style="font-size:1.4rem;margin:24px 0 14px">Withdrawals</h2>
+        ${withdrawalRows(summary.withdrawals)}
+      </div>
+    </div>
+  `;
+}
+
+function renderSeller(main, user, summary) {
+  main.innerHTML = `
+    ${dashboardHeader(user, 'Seller Dashboard')}
+
+    <div class="grid grid-4" style="margin:24px 0">
+      ${statCard('Products', summary.products.length)}
+      ${statCard('Orders', summary.ordersAsSeller.length)}
+      ${statCard('Pending Withdrawals', summary.withdrawals.filter(w => w.status === 'pending').length)}
+      ${statCard('Store Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">My Products</h2>
+        ${rows(summary.products, 'No products listed yet.', productRow)}
+      </div>
+
+      <div>
+        <h2 style="font-size:1.4rem;margin:0 0 14px">Orders</h2>
+        ${rows(summary.ordersAsSeller, 'No orders yet.', o => `
+          <div class="card" style="margin-bottom:10px">
+            <div class="card-body">${fmtPrice(o.amount)} - ${o.status}</div>
+          </div>
+        `)}
+
+        <h2 style="font-size:1.4rem;margin:24px 0 14px">Withdrawals</h2>
+        ${withdrawalRows(summary.withdrawals)}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdmin(main, user, summary) {
+  main.innerHTML = `
+    ${dashboardHeader(user, 'Superadmin Dashboard')}
+
+    <div class="grid grid-4" style="margin:24px 0">
+      ${statCard('Admin Control', 'Open', '/admin.html')}
+      ${statCard('Posted Jobs', summary.jobsCreated.length)}
+      ${statCard('Messages', summary.notifications.filter(n => !n.read).length, '/chat.html')}
+      ${statCard('Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
+    </div>
+  `;
+}
