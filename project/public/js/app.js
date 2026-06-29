@@ -59,59 +59,111 @@ const Auth = (function () {
   function isLoggedIn() { return !!getToken(); }
 
   async function signup(payload) {
-    const client = await initSb();
-    if (!client) throw new Error('Supabase not initialized');
+  const client = await initSb();
 
-    // 1. Check if email is in admin_emails table (anon can read it)
-    const { data: adminRec } = await client.from('admin_emails').select('email').eq('email', payload.email.toLowerCase()).maybeSingle();
-    const isAdmin = !!adminRec;
+  if (!client) {
+    throw new Error('Supabase not initialized');
+  }
 
-    // 2. Create auth user via Supabase auth
-    const { data: authData, error: authErr } = await client.auth.signUp({ email: payload.email, password: payload.password });
-    if (authErr) throw new Error(authErr.message);
-    const userId = authData.user?.id;
-    if (!userId) throw new Error('Failed to create auth user');
+  // 1. Create auth user.
+  // The database trigger will create the public.profiles row automatically.
+  const { data: authData, error: authErr } = await client.auth.signUp({
+    email: payload.email,
+    password: payload.password,
+    options: {
+      data: {
+        role: payload.role,
+        first_name: payload.first_name,
+        middle_name: payload.middle_name,
+        last_name: payload.last_name,
+        display_name: payload.display_name,
+        phone: payload.phone,
+        country: payload.country || 'Nigeria',
+        state: payload.state,
+        city: payload.city,
+        address: payload.address,
+        bank_name: payload.bank_name,
+        account_number: payload.account_number,
+        account_holder_name: payload.account_holder_name,
+        profile_image: payload.profile_image || null
+      }
+    }
+  });
 
-    // 3. Insert profile using the authenticated session
-    const finalRole = isAdmin ? 'admin' : payload.role;
-    const { data: profile, error: profErr } = await client.from('profiles').insert({
-      user_id: userId,
-      role: finalRole,
-      first_name: payload.first_name,
-      middle_name: payload.middle_name,
-      last_name: payload.last_name,
-      display_name: payload.display_name,
-      email: payload.email,
-      phone: payload.phone,
-      country: payload.country || 'Nigeria',
-      state: payload.state,
-      city: payload.city,
-      address: payload.address,
-      bank_name: payload.bank_name,
-      account_number: payload.account_number,
-      account_holder_name: payload.account_holder_name,
-      profile_image: payload.profile_image || null,
-      kyc_level: payload.kyc_selfie ? 1 : 0
-    }).select().single();
-    if (profErr) throw new Error(profErr.message);
+  if (authErr) {
+    throw new Error(authErr.message);
+  }
 
-    // 4. Submit KYC if selfie provided
-    if (payload.kyc_selfie) {
-      await client.from('kyc_submissions').insert({
-        user_id: userId,
-        selfie_url: payload.kyc_selfie,
-        full_name: `${payload.first_name || ''} ${payload.last_name || ''}`.trim()
-      });
+  const userId = authData.user?.id;
+
+  if (!userId) {
+    throw new Error('Failed to create auth user');
+  }
+
+  // 2. Wait for trigger-created profile.
+  let profile = null;
+
+  for (let i = 0; i < 10; i++) {
+    const { data } = await client
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (data) {
+      profile = data;
+      break;
     }
 
-    // 5. Get session token
-    const { data: session } = await client.auth.getSession();
-    const token = session?.session?.access_token || '';
-    const refreshToken = session?.session?.refresh_token || '';
-
-    setSession(token, refreshToken, profile);
-    return { user: profile, token, refreshToken };
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
+
+  if (!profile) {
+    throw new Error('Account created, but profile was not ready. Please sign in again.');
+  }
+
+  // 3. Submit KYC if selfie was uploaded.
+  // This now happens AFTER the profile exists.
+  if (payload.kyc_selfie) {
+    const { error: kycErr } = await client.from('kyc_submissions').insert({
+      user_id: userId,
+      selfie_url: payload.kyc_selfie,
+      full_name: `${payload.first_name || ''} ${payload.last_name || ''}`.trim(),
+      status: 'pending'
+    });
+
+    if (kycErr) {
+      throw new Error(kycErr.message);
+    }
+
+    // Optional: mark the profile as Level 1 while waiting for admin KYC approval.
+    const { data: updatedProfile, error: updateErr } = await client
+      .from('profiles')
+      .update({ kyc_level: 1 })
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (!updateErr && updatedProfile) {
+      profile = updatedProfile;
+    }
+  }
+
+  // 4. Get active auth session.
+  const { data: sessionData } = await client.auth.getSession();
+
+  const token = sessionData?.session?.access_token || '';
+  const refreshToken = sessionData?.session?.refresh_token || '';
+
+  // 5. Save frontend session.
+  setSession(token, refreshToken, profile);
+
+  return {
+    user: profile,
+    token,
+    refreshToken
+  };
+}
 
   async function signin(email, password) {
     const client = await initSb();
