@@ -61,10 +61,20 @@ router.get('/:id', async (req, res) => {
 
 // Create job
 router.post('/', authMiddleware, async (req, res) => {
+  if (!['client', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only clients can post jobs.' });
+  }
+
   const c = authedClient(req);
+
   const { data, error } = await c.from('jobs').insert({
-    user_id: req.user.id, ...req.body, status: 'pending'
+    ...req.body,
+    user_id: req.user.id,
+    client_id: req.user.id,
+    job_type: req.body.job_type || 'remote',
+    status: 'pending'
   }).select().single();
+
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
@@ -79,11 +89,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // Bids
 router.post('/:id/bids', authMiddleware, async (req, res) => {
+  if (!['freelancer', 'worker', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only freelancers and workers can apply for jobs.' });
+  }
+
   const c = authedClient(req);
   const { amount, message, duration } = req.body;
+
   const { data, error } = await c.from('job_bids').insert({
-    job_id: req.params.id, user_id: req.user.id, amount, message, duration
+    job_id: req.params.id,
+    user_id: req.user.id,
+    amount,
+    message,
+    duration
   }).select().single();
+
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
