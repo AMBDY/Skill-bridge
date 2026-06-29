@@ -4,41 +4,140 @@ document.addEventListener('DOMContentLoaded', async () => {
 const referenceDropZone = document.getElementById('referenceDropZone');
 const referenceFileInput = document.getElementById('referenceFileInput');
 const referencePreview = document.getElementById('referencePreview');
+const addMoreReferencesBtn = document.getElementById('addMoreReferencesBtn');
+const referencePlaceholder = document.getElementById('referencePlaceholder');
+
+function renderReferencePreview() {
+  if (!referencePreview) return;
+
+  referencePreview.innerHTML = '';
+
+  uploadedReferenceImages.forEach((url, index) => {
+    const item = document.createElement('div');
+    item.className = 'reference-preview-item';
+    item.style.position = 'relative';
+    item.style.width = '92px';
+    item.style.height = '92px';
+    item.style.borderRadius = '10px';
+    item.style.overflow = 'hidden';
+    item.style.border = '1px solid var(--border)';
+    item.style.background = 'var(--bg-soft)';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Reference image';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.innerHTML = '×';
+    removeBtn.title = 'Remove image';
+    removeBtn.style.position = 'absolute';
+    removeBtn.style.top = '4px';
+    removeBtn.style.right = '4px';
+    removeBtn.style.width = '24px';
+    removeBtn.style.height = '24px';
+    removeBtn.style.borderRadius = '50%';
+    removeBtn.style.background = 'rgba(0,0,0,0.65)';
+    removeBtn.style.color = '#fff';
+    removeBtn.style.fontSize = '18px';
+    removeBtn.style.lineHeight = '1';
+    removeBtn.style.display = 'flex';
+    removeBtn.style.alignItems = 'center';
+    removeBtn.style.justifyContent = 'center';
+
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      uploadedReferenceImages.splice(index, 1);
+      renderReferencePreview();
+    });
+
+    item.appendChild(img);
+    item.appendChild(removeBtn);
+    referencePreview.appendChild(item);
+  });
+
+  if (uploadedReferenceImages.length > 0) {
+    addMoreReferencesBtn.style.display = 'inline-flex';
+    referencePlaceholder.innerHTML = `
+      <p style="color:var(--success);font-size:0.9rem">
+        ${uploadedReferenceImages.length} image${uploadedReferenceImages.length > 1 ? 's' : ''} uploaded.
+      </p>
+      <p style="color:var(--text-muted);font-size:0.8rem">
+        Click here or use “Add more images” to upload more.
+      </p>
+    `;
+  } else {
+    addMoreReferencesBtn.style.display = 'none';
+    referencePlaceholder.innerHTML = `
+      <div style="font-size:1.8rem;margin-bottom:6px">🖼️</div>
+      <p style="color:var(--text-soft);font-size:0.9rem">Click to upload reference images</p>
+      <p style="color:var(--text-muted);font-size:0.8rem">You can upload multiple images, delete any one, and add more</p>
+    `;
+  }
+}
+
+async function uploadReferenceFiles(files) {
+  const list = Array.from(files || []);
+
+  if (!list.length) return;
+
+  for (const file of list) {
+    if (!file.type.startsWith('image/')) {
+      Toast.show(file.name + ' is not an image');
+      continue;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      Toast.show(file.name + ' is larger than 5MB');
+      continue;
+    }
+
+    try {
+      Toast.show('Uploading ' + file.name + '...');
+      const url = await uploadImage(file, 'job-references');
+      uploadedReferenceImages.push(url);
+      renderReferencePreview();
+    } catch (err) {
+      Toast.show('Upload failed: ' + err.message);
+    }
+  }
+
+  if (referenceFileInput) {
+    referenceFileInput.value = '';
+  }
+}
 
 if (referenceDropZone && referenceFileInput) {
-  referenceDropZone.addEventListener('click', () => referenceFileInput.click());
+  referenceDropZone.addEventListener('click', () => {
+    referenceFileInput.click();
+  });
+
+  referenceDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    referenceDropZone.style.borderColor = 'var(--gold)';
+  });
+
+  referenceDropZone.addEventListener('dragleave', () => {
+    referenceDropZone.style.borderColor = 'var(--border)';
+  });
+
+  referenceDropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    referenceDropZone.style.borderColor = 'var(--border)';
+    await uploadReferenceFiles(e.dataTransfer.files);
+  });
 
   referenceFileInput.addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files || []);
+    await uploadReferenceFiles(e.target.files);
+  });
+}
 
-    for (const file of files) {
-      if (!file.type.startsWith('image/')) {
-        Toast.show('Only image files are allowed');
-        continue;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        Toast.show(file.name + ' is larger than 5MB');
-        continue;
-      }
-
-      try {
-        Toast.show('Uploading ' + file.name + '...');
-        const url = await uploadImage(file, 'job-references');
-        uploadedReferenceImages.push(url);
-
-        const img = document.createElement('img');
-        img.src = url;
-        img.style.width = '84px';
-        img.style.height = '84px';
-        img.style.objectFit = 'cover';
-        img.style.borderRadius = '8px';
-        img.style.border = '1px solid var(--border)';
-        referencePreview.appendChild(img);
-      } catch (err) {
-        Toast.show('Upload failed: ' + err.message);
-      }
-    }
+if (addMoreReferencesBtn && referenceFileInput) {
+  addMoreReferencesBtn.addEventListener('click', () => {
+    referenceFileInput.click();
   });
 }
   const catSel = document.getElementById('catSel');
