@@ -280,4 +280,49 @@ router.get('/notifications', authMiddleware, async (req, res) => {
   res.json(data);
 });
 
+// Public CMS content for homepage/site
+router.get('/cms/slides', async (req, res) => {
+  const { data, error } = await supabase
+    .from('homepage_slides')
+    .select('*')
+    .eq('status', 'active')
+    .order('sort_order', { ascending: true })
+    .limit(20);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.get('/cms/content', async (req, res) => {
+  const { target_page } = req.query;
+
+  let q = supabase
+    .from('site_content')
+    .select('*')
+    .eq('status', 'active');
+
+  if (target_page) q = q.eq('target_page', target_page);
+
+  const { data, error } = await q.order('updated_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.get('/cms/featured', async (req, res) => {
+  const { placement } = req.query;
+
+  let q = supabase
+    .from('featured_items')
+    .select('*')
+    .eq('status', 'active');
+
+  if (placement) q = q.eq('placement', placement);
+
+  const { data, error } = await q.order('sort_order', { ascending: true });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
 module.exports = router;
