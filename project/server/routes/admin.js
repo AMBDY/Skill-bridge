@@ -17,6 +17,26 @@ async function profilesByIds(client, ids) {
   return new Map((data || []).map(p => [p.user_id, p]));
 }
 
+async function attachProfilesByUserId(client, rows, key = 'user_id', outputKey = 'user') {
+  if (!rows || !rows.length) return rows || [];
+
+  const ids = [...new Set(rows.map(r => r[key]).filter(Boolean))];
+
+  if (!ids.length) return rows;
+
+  const { data: profiles } = await client
+    .from('profiles')
+    .select('user_id, display_name, email, profile_image, role, kyc_level')
+    .in('user_id', ids);
+
+  const map = new Map((profiles || []).map(p => [p.user_id, p]));
+
+  return rows.map(row => ({
+    ...row,
+    [outputKey]: map.get(row[key]) || null
+  }));
+}
+
 // Overview stats
 router.get('/overview', async (req, res) => {
   const c = authedClient(req);
@@ -168,59 +188,79 @@ router.delete('/ads/:id', async (req, res) => {
 router.get('/testimonials', async (req, res) => {
   const c = authedClient(req);
   const { status } = req.query;
-  let q = c.from('testimonials').select('*, profiles:user_id(display_name, email, profile_image, role)').order('created_at', { ascending: false }).limit(100);
-  if (status) q = q.eq('status', status);
-  const { data, error } = await q;
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
 
-router.put('/testimonials/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { status, admin_note } = req.body;
-  const patch = { status, admin_note: admin_note || null };
-  if (status === 'approved') patch.approved_at = new Date().toISOString();
-  const { data, error } = await c.from('testimonials').update(patch).eq('id', req.params.id).select().single();
+  let q = c
+    .from('testimonials')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (status) q = q.eq('status', status);
+
+  const { data, error } = await q;
+
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+
+  const withProfiles = await attachProfilesByUserId(c, data || [], 'user_id', 'profiles');
+
+  res.json(withProfiles);
 });
 
 // Comments moderation
 router.get('/comments', async (req, res) => {
   const c = authedClient(req);
   const { status } = req.query;
-  let q = c.from('comments').select('*, profiles:user_id(display_name, email, profile_image, role)').order('created_at', { ascending: false }).limit(100);
-  if (status) q = q.eq('status', status);
-  const { data, error } = await q;
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
 
-router.put('/comments/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { status } = req.body;
-  const { data, error } = await c.from('comments').update({ status }).eq('id', req.params.id).select().single();
+  let q = c
+    .from('comments')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (status) q = q.eq('status', status);
+
+  const { data, error } = await q;
+
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+
+  const withProfiles = await attachProfilesByUserId(c, data || [], 'user_id', 'profiles');
+
+  res.json(withProfiles);
 });
 
 // Reviews moderation
 router.get('/reviews', async (req, res) => {
   const c = authedClient(req);
   const { status } = req.query;
-  let q = c.from('reviews').select('*, reviewer:reviewer_id(display_name, email, profile_image), reviewee:reviewee_id(display_name, email, profile_image)').order('created_at', { ascending: false }).limit(100);
-  if (status) q = q.eq('status', status);
-  const { data, error } = await q;
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
 
-router.put('/reviews/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { status } = req.body;
-  const { data, error } = await c.from('reviews').update({ status }).eq('id', req.params.id).select().single();
+  let q = c
+    .from('reviews')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (status) q = q.eq('status', status);
+
+  const { data, error } = await q;
+
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+
+  const reviewerIds = [...new Set((data || []).map(r => r.reviewer_id).filter(Boolean))];
+  const revieweeIds = [...new Set((data || []).map(r => r.reviewee_id).filter(Boolean))];
+  const ids = [...new Set([...reviewerIds, ...revieweeIds])];
+
+  const { data: profiles } = await c
+    .from('profiles')
+    .select('user_id, display_name, email, profile_image, role')
+    .in('user_id', ids);
+
+  const map = new Map((profiles || []).map(p => [p.user_id, p]));
+
+  res.json((data || []).map(r => ({
+    ...r,
+    reviewer: map.get(r.reviewer_id) || null,
+    reviewee: map.get(r.reviewee_id) || null
+  })));
 });
 
 // Audit logs
@@ -258,6 +298,152 @@ router.get('/export/:sheet', async (req, res) => {
     rows = data || [];
   }
   res.json({ sheet, rows, exportedAt: new Date().toISOString() });
+});
+
+// Homepage slides
+router.get('/slides', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('homepage_slides')
+    .select('*')
+    .order('sort_order', { ascending: true });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/slides', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('homepage_slides')
+    .insert(req.body)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/slides/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('homepage_slides')
+    .update({ ...req.body, updated_at: new Date().toISOString() })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/slides/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c
+    .from('homepage_slides')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+
+// Site content
+router.get('/site-content', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('site_content')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/site-content', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('site_content')
+    .insert(req.body)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/site-content/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('site_content')
+    .update({ ...req.body, updated_at: new Date().toISOString() })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/site-content/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c
+    .from('site_content')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+
+// Featured items
+router.get('/featured-items', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('featured_items')
+    .select('*')
+    .order('sort_order', { ascending: true });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/featured-items', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('featured_items')
+    .insert(req.body)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/featured-items/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c
+    .from('featured_items')
+    .update(req.body)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/featured-items/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c
+    .from('featured_items')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 module.exports = router;
