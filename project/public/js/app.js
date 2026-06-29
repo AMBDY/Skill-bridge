@@ -240,6 +240,14 @@ function renderNav() {
         `}
         <button class="icon-btn hamburger" id="hamburger">☰</button>
       </div>
+      <div class="mobile-nav-panel">
+  <a class="mobile-nav-link" href="/hire.html">Hire Talent</a>
+  <a class="mobile-nav-link" href="/shop.html">Shop Products</a>
+  <a class="mobile-nav-link" href="/jobs.html">Find Jobs</a>
+  <a class="mobile-nav-link" href="/post-job.html">Post Job</a>
+  <a class="mobile-nav-link" href="/profile.html">Profile</a>
+  <a class="mobile-nav-link" href="/dashboard.html">Dashboard</a>
+</div>
     </div>`;
   Theme.updateToggle();
   document.getElementById('themeToggle').addEventListener('click', Theme.toggle);
@@ -247,6 +255,18 @@ function renderNav() {
   if (si) si.addEventListener('keydown', (e) => { if (e.key === 'Enter') window.location.href = `/search.html?q=${encodeURIComponent(si.value)}`; });
   const lo = document.getElementById('logoutBtn');
   if (lo) lo.addEventListener('click', () => { Auth.logout(); Toast.show('Signed out'); });
+  const hamburger = document.getElementById('hamburger');
+if (hamburger) {
+  hamburger.addEventListener('click', () => {
+    document.body.classList.toggle('mobile-nav-open');
+  });
+}
+
+document.querySelectorAll('.mobile-nav-link').forEach(link => {
+  link.addEventListener('click', () => {
+    document.body.classList.remove('mobile-nav-open');
+  });
+});
 }
 
 function renderFooter() {
