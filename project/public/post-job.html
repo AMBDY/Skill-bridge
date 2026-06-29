@@ -13,7 +13,22 @@
     <h1 class="auth-title">Post a Job</h1>
     <p class="auth-sub">Describe what you need. Admin approval is required before publishing.</p>
     <form id="postJobForm">
-      <div class="form-group"><label class="form-label">Category</label><select class="form-select" name="category_id" id="catSel" required></select></div>
+      <div class="form-group">
+  <label class="form-label">Work Category</label>
+  <select class="form-select" name="category_id" id="catSel" required></select>
+</div>
+
+<div class="form-group">
+  <label class="form-label">Job Type</label>
+  <select class="form-select" name="job_type" required>
+    <option value="remote">Remote</option>
+    <option value="office">Office</option>
+    <option value="contract">Contract</option>
+    <option value="hybrid">Hybrid</option>
+    <option value="internship">Internship</option>
+    <option value="other">Other</option>
+  </select>
+</div>
       <div class="form-group"><label class="form-label">Title</label><input class="form-input" name="title" required></div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" name="description" required></textarea></div>
       <div class="form-row">
