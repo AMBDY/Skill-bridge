@@ -4,9 +4,10 @@ window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXB
 
 // Load supabase-js from CDN (UMD build exposes window.supabaseJs)
 (function () {
-  if (window.supabaseJs) return;
+  if (window.supabase) return;
+
   const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase-js.min.js';
-  s.async = false;
+  s.src = 'https://unpkg.com/@supabase/supabase-js@2';
+  s.onload = () => console.log('Supabase loaded');
   document.head.appendChild(s);
 })();
