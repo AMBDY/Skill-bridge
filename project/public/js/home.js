@@ -33,26 +33,55 @@ const RECENT_JOBS = [
   { title: 'Living Room Interior', price: 320000, cat: 'Interior Decoration', img: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg' },
 ];
 
-function initHero() {
+async function initHero() {
   const hero = document.getElementById('hero');
   const dots = document.getElementById('heroDots');
-  HERO_SLIDES.forEach((url, i) => {
+
+  let slides = [];
+
+  try {
+    slides = await API.get('/marketplace/cms/slides');
+  } catch (err) {
+    slides = [];
+  }
+
+  if (!slides.length) {
+    slides = HERO_SLIDES.map((url, i) => ({
+      image_url: url,
+      title: i === 0 ? 'Where African Talent Meets Opportunity' : '',
+      subtitle: '',
+      cta_label: '',
+      cta_url: ''
+    }));
+  }
+
+  slides.forEach((item, i) => {
     const slide = document.createElement('div');
     slide.className = 'hero-slide' + (i === 0 ? ' active' : '');
-    slide.style.backgroundImage = `url('${url}')`;
+    slide.style.backgroundImage = `url('${item.image_url}')`;
     hero.insertBefore(slide, hero.firstChild);
+
     const dot = document.createElement('div');
     dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
     dot.addEventListener('click', () => goTo(i));
     dots.appendChild(dot);
   });
+
   let cur = 0;
+
   function goTo(i) {
-    document.querySelectorAll('.hero-slide').forEach((s, idx) => s.classList.toggle('active', idx === i));
-    document.querySelectorAll('.hero-dot').forEach((d, idx) => d.classList.toggle('active', idx === i));
+    document.querySelectorAll('.hero-slide').forEach((s, idx) => {
+      s.classList.toggle('active', idx === i);
+    });
+
+    document.querySelectorAll('.hero-dot').forEach((d, idx) => {
+      d.classList.toggle('active', idx === i);
+    });
+
     cur = i;
   }
-  setInterval(() => goTo((cur + 1) % HERO_SLIDES.length), 5000);
+
+  setInterval(() => goTo((cur + 1) % slides.length), 5000);
 }
 
 function renderFeaturedCats() {
