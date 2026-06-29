@@ -115,6 +115,46 @@ input, select, textarea { font-family: inherit; font-size: 1rem; }
 .icon-btn .badge { position: absolute; top: 4px; right: 4px; background: var(--terracotta); color: #fff; font-size: 0.65rem; min-width: 16px; height: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 .hamburger { display: none; }
 
+.mobile-nav-panel {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .navbar .nav-inner {
+    position: relative;
+  }
+
+  .mobile-nav-panel {
+    display: none;
+    position: absolute;
+    top: 68px;
+    left: 16px;
+    right: 16px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 12px;
+    z-index: 200;
+  }
+
+  body.mobile-nav-open .mobile-nav-panel {
+    display: grid;
+    gap: 6px;
+  }
+
+  .mobile-nav-link {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+  }
+
+  .mobile-nav-link:hover {
+    background: var(--bg-soft);
+    color: var(--gold);
+  }
+}
+
 /* Cards */
 .card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
 .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
