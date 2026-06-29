@@ -133,31 +133,31 @@ async function ensureVerifiedReview(req, payload) {
 router.get('/testimonials', async (req, res) => {
   const { data, error } = await supabase
     .from('testimonials')
-    .select('*, profiles:user_id(display_name, profile_image, role, city, state, kyc_level)')
+    .select('*')
     .eq('status', 'approved')
     .eq('consent_public', true)
     .order('approved_at', { ascending: false })
     .limit(12);
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
 
-router.post('/testimonials', authMiddleware, async (req, res) => {
-  const c = authedClient(req);
-  const { message, rating, show_profile_image, show_display_name, consent_public } = req.body;
-  if (!message || message.trim().length < 10) return res.status(400).json({ error: 'Testimonial must be at least 10 characters.' });
-  if (!consent_public) return res.status(400).json({ error: 'Public display consent is required.' });
-  const { data, error } = await c.from('testimonials').insert({
-    user_id: req.user.id,
-    message: message.trim(),
-    rating: rating || null,
-    show_profile_image: show_profile_image !== false,
-    show_display_name: show_display_name !== false,
-    consent_public: true,
-    status: 'pending'
-  }).select().single();
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+
+  const ids = [...new Set((data || []).map(t => t.user_id).filter(Boolean))];
+
+  let profileMap = new Map();
+
+  if (ids.length) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, display_name, profile_image, role, city, state, kyc_level')
+      .in('user_id', ids);
+
+    profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+  }
+
+  res.json((data || []).map(t => ({
+    ...t,
+    profiles: profileMap.get(t.user_id) || null
+  })));
 });
 
 // Public comments/questions under products, services, and posted jobs
