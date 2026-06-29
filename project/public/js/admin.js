@@ -7,24 +7,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const sections = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'users', label: 'Users' },
-    { id: 'kyc', label: 'KYC Review' },
-    { id: 'jobs', label: 'Job Moderation' },
-    { id: 'testimonials', label: 'Testimonials' },
-    { id: 'comments', label: 'Comments' },
-    { id: 'reviews', label: 'Reviews' },
-    { id: 'disputes', label: 'Disputes' },
-    { id: 'payments', label: 'Payments' },
-    { id: 'revenue', label: 'Revenue' },
-    { id: 'audit', label: 'Audit Logs' },
-    { id: 'subs', label: 'Subscriptions' },
-    { id: 'ai', label: 'AI Ranking Control' },
-    { id: 'ads', label: 'Content & Ads' },
-    { id: 'export', label: 'Google Sheets Export' },
-    { id: 'fraud', label: 'Fraud Monitoring' },
-    { id: 'settings', label: 'Settings' },
-  ];
+  { id: 'overview', label: 'Overview' },
+  { id: 'slides', label: 'Homepage Slides' },
+  { id: 'siteContent', label: 'Site Content' },
+  { id: 'featured', label: 'Featured Items' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'users', label: 'Users' },
+  { id: 'kyc', label: 'KYC Review' },
+  { id: 'jobs', label: 'Job Moderation' },
+  { id: 'testimonials', label: 'Testimonials' },
+  { id: 'comments', label: 'Comments' },
+  { id: 'reviews', label: 'Reviews' },
+  { id: 'disputes', label: 'Disputes' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'audit', label: 'Audit Logs' },
+  { id: 'subs', label: 'Subscriptions' },
+  { id: 'ai', label: 'AI Ranking Control' },
+  { id: 'ads', label: 'Content & Ads' },
+  { id: 'export', label: 'Google Sheets Export' },
+  { id: 'fraud', label: 'Fraud Monitoring' },
+  { id: 'settings', label: 'Settings' }
+];
   const nav = document.getElementById('adminNav');
   nav.innerHTML = sections.map(s => `<a href="#" data-sec="${s.id}" class="${s.id === 'overview' ? 'active' : ''}">${s.label}</a>`).join('');
   nav.querySelectorAll('a').forEach(a => a.addEventListener('click', (e) => {
@@ -39,6 +43,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     main.innerHTML = '<div class="skeleton" style="height:200px"></div>';
     try {
       if (sec === 'overview') return await loadOverview();
+      if (sec === 'slides') return await loadSlides();
+      if (sec === 'siteContent') return await loadSiteContent();
+      if (sec === 'featured') return await loadFeatured();
+      if (sec === 'categories') return await loadCategoriesAdmin();
       if (sec === 'users') return await loadUsers();
       if (sec === 'kyc') return await loadKyc();
       if (sec === 'jobs') return await loadJobs();
@@ -57,6 +65,483 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (sec === 'settings') return await loadSettings();
     } catch (e) { main.innerHTML = `<p>Error: ${e.message}</p>`; }
   }
+
+  async function loadSlides() {
+  const slides = await API.get('/admin/slides');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Homepage Slides</h1>
+
+    <div class="card" style="margin:24px 0">
+      <div class="card-body">
+        <h3>Add Slide</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <input class="form-input" id="slideTitle">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input class="form-input" type="number" id="slideSort" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subtitle</label>
+          <textarea class="form-textarea" id="slideSubtitle"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Image URL</label>
+          <input class="form-input" id="slideImage">
+          ${adminImageUploadField('slideImage', 'slideImageFile', 'slideImagePreview', 'admin-slides')}
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">CTA Label</label>
+            <input class="form-input" id="slideCtaLabel">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">CTA URL</label>
+            <input class="form-input" id="slideCtaUrl">
+          </div>
+        </div>
+
+        <button class="btn btn-gold" onclick="createSlide()">Create Slide</button>
+      </div>
+    </div>
+
+    <div class="grid grid-3">
+      ${slides.map(s => `
+        <div class="card">
+          <div class="card-img">
+            <img src="${s.image_url}" alt="${s.title || 'Slide'}">
+          </div>
+
+          <div class="card-body">
+            <h3>${s.title || 'Untitled slide'}</h3>
+            <p style="color:var(--text-soft);font-size:0.9rem">${s.subtitle || ''}</p>
+            <div class="card-meta">
+              <span>${s.status}</span>
+              <span>Order: ${s.sort_order}</span>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-outline btn-sm" onclick="toggleSlide('${s.id}', '${s.status === 'active' ? 'paused' : 'active'}')">
+                ${s.status === 'active' ? 'Pause' : 'Activate'}
+              </button>
+
+              <button class="btn btn-outline btn-sm" onclick="deleteSlide('${s.id}')">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.createSlide = async () => {
+  try {
+    await API.post('/admin/slides', {
+      title: document.getElementById('slideTitle').value,
+      subtitle: document.getElementById('slideSubtitle').value,
+      image_url: document.getElementById('slideImage').value,
+      cta_label: document.getElementById('slideCtaLabel').value,
+      cta_url: document.getElementById('slideCtaUrl').value,
+      sort_order: Number(document.getElementById('slideSort').value || 0),
+      status: 'active'
+    });
+
+    Toast.show('Slide created');
+    load('slides');
+  } catch (e) {
+    Toast.show(e.message);
+  }
+};
+
+window.toggleSlide = async (id, status) => {
+  await API.put(`/admin/slides/${id}`, { status });
+  Toast.show('Slide updated');
+  load('slides');
+};
+
+window.deleteSlide = async (id) => {
+  await API.del(`/admin/slides/${id}`);
+  Toast.show('Slide deleted');
+  load('slides');
+  bindAdminImageUpload('slideImage', 'slideImageFile', 'slideImagePreview', 'admin-slides');
+};
+
+  async function loadSiteContent() {
+  const items = await API.get('/admin/site-content');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Site Content</h1>
+
+    <div class="card" style="margin:24px 0">
+      <div class="card-body">
+        <h3>Add Content Block</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Content Key</label>
+            <input class="form-input" id="contentKey" placeholder="homepage_mission">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target Page</label>
+            <input class="form-input" id="contentPage" value="homepage">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input class="form-input" id="contentTitle">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Body</label>
+          <textarea class="form-textarea" id="contentBody"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Media URL</label>
+          <input class="form-input" id="contentMedia">
+          ${adminImageUploadField('contentMedia', 'contentMediaFile', 'contentMediaPreview', 'admin-content')}
+        </div>
+
+          <div class="form-group">
+            <label class="form-label">Link URL</label>
+            <input class="form-input" id="contentLink">
+          </div>
+        </div>
+
+        <button class="btn btn-gold" onclick="createContentBlock()">Create Content</button>
+      </div>
+    </div>
+
+    ${items.map(item => `
+      <div class="card" style="margin-top:12px">
+        <div class="card-body">
+          <strong>${item.content_key}</strong>
+          <h3>${item.title || ''}</h3>
+          <p style="color:var(--text-soft)">${item.body || ''}</p>
+          <span class="badge badge-kyc">${item.status}</span>
+
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-outline btn-sm" onclick="toggleContent('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
+              ${item.status === 'active' ? 'Pause' : 'Activate'}
+            </button>
+
+            <button class="btn btn-outline btn-sm" onclick="deleteContent('${item.id}')">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+window.createContentBlock = async () => {
+  await API.post('/admin/site-content', {
+    content_key: document.getElementById('contentKey').value,
+    title: document.getElementById('contentTitle').value,
+    body: document.getElementById('contentBody').value,
+    media_url: document.getElementById('contentMedia').value,
+    link_url: document.getElementById('contentLink').value,
+    target_page: document.getElementById('contentPage').value,
+    status: 'active'
+  });
+
+  Toast.show('Content created');
+  load('siteContent');
+};
+
+window.toggleContent = async (id, status) => {
+  await API.put(`/admin/site-content/${id}`, { status });
+  Toast.show('Content updated');
+  load('siteContent');
+};
+
+window.deleteContent = async (id) => {
+  await API.del(`/admin/site-content/${id}`);
+  Toast.show('Content deleted');
+  load('siteContent');
+  bindAdminImageUpload('contentMedia', 'contentMediaFile', 'contentMediaPreview', 'admin-content');
+};
+
+  async function loadCategoriesAdmin() {
+  const cats = await API.get('/marketplace/categories');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Categories</h1>
+
+    <div class="card" style="margin:24px 0">
+      <div class="card-body">
+        <h3>Add Category</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" id="catName">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Slug</label>
+            <input class="form-input" id="catSlug">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ecosystem</label>
+            <select class="form-select" id="catEco">
+              <option value="hire">Hire Talent</option>
+              <option value="shop">Shop Products</option>
+              <option value="jobs">Find Jobs</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input class="form-input" type="number" id="catSort" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="catDesc"></textarea>
+        </div>
+
+        <button class="btn btn-gold" onclick="createCategory()">Create Category</button>
+      </div>
+    </div>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Slug</th>
+          <th>Ecosystem</th>
+          <th>Sort</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        ${cats.map(c => `
+          <tr>
+            <td>${c.name}</td>
+            <td>${c.slug}</td>
+            <td>${c.ecosystem}</td>
+            <td>${c.sort_order}</td>
+            <td>
+              <button class="btn btn-outline btn-sm" onclick="deleteCategory('${c.id}')">Delete</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+window.createCategory = async () => {
+  await API.post('/admin/categories', {
+    name: document.getElementById('catName').value,
+    slug: document.getElementById('catSlug').value,
+    ecosystem: document.getElementById('catEco').value,
+    description: document.getElementById('catDesc').value,
+    sort_order: Number(document.getElementById('catSort').value || 0)
+  });
+
+  Toast.show('Category created');
+  load('categories');
+};
+
+window.deleteCategory = async (id) => {
+  await API.del(`/admin/categories/${id}`);
+  Toast.show('Category deleted');
+  load('categories');
+};
+
+  function adminImageUploadField(inputId, fileId, previewId, folder = 'admin-media') {
+  return `
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <input type="file" id="${fileId}" accept="image/*" style="display:none">
+      <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('${fileId}').click()">
+        Upload Image
+      </button>
+      <span style="color:var(--text-muted);font-size:0.82rem">or paste image URL above</span>
+    </div>
+    <div id="${previewId}" style="margin-top:10px"></div>
+  `;
+}
+
+window.bindAdminImageUpload = function (inputId, fileId, previewId, folder = 'admin-media') {
+  const fileInput = document.getElementById(fileId);
+  const urlInput = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+
+  if (!fileInput || !urlInput) return;
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      Toast.show('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      Toast.show('Image must be under 5MB');
+      return;
+    }
+
+    try {
+      Toast.show('Uploading image...');
+      const url = await uploadImage(file, folder);
+      urlInput.value = url;
+
+      if (preview) {
+        preview.innerHTML = `
+          <img src="${url}" style="width:160px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        `;
+      }
+
+      Toast.show('Image uploaded');
+    } catch (err) {
+      Toast.show('Upload failed: ' + err.message);
+    } finally {
+      fileInput.value = '';
+    }
+  });
+};
+
+  async function loadFeatured() {
+  const items = await API.get('/admin/featured-items');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Featured Items</h1>
+
+    <div class="card" style="margin:24px 0">
+      <div class="card-body">
+        <h3>Add Featured Item</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Item Type</label>
+            <select class="form-select" id="featType">
+              <option value="service">Service</option>
+              <option value="product">Product</option>
+              <option value="job">Job</option>
+              <option value="seller">Seller</option>
+              <option value="freelancer">Freelancer</option>
+              <option value="category">Category</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Placement</label>
+            <input class="form-input" id="featPlacement" value="homepage">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <input class="form-input" id="featTitle">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input class="form-input" type="number" id="featSort" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subtitle</label>
+          <textarea class="form-textarea" id="featSubtitle"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Image URL</label>
+          <input class="form-input" id="featImage">
+          ${adminImageUploadField('featImage', 'featImageFile', 'featImagePreview', 'admin-featured')}
+        </div>
+
+          <div class="form-group">
+            <label class="form-label">Link URL</label>
+            <input class="form-input" id="featLink">
+          </div>
+        </div>
+
+        <button class="btn btn-gold" onclick="createFeatured()">Create Featured Item</button>
+      </div>
+    </div>
+
+    <div class="grid grid-3">
+      ${items.map(item => `
+        <div class="card">
+          ${item.image_url ? `<div class="card-img"><img src="${item.image_url}"></div>` : ''}
+          <div class="card-body">
+            <span class="badge badge-kyc">${item.item_type}</span>
+            <h3>${item.title || 'Untitled'}</h3>
+            <p style="color:var(--text-soft)">${item.subtitle || ''}</p>
+
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-outline btn-sm" onclick="toggleFeatured('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
+                ${item.status === 'active' ? 'Pause' : 'Activate'}
+              </button>
+
+              <button class="btn btn-outline btn-sm" onclick="deleteFeatured('${item.id}')">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.createFeatured = async () => {
+  await API.post('/admin/featured-items', {
+    item_type: document.getElementById('featType').value,
+    title: document.getElementById('featTitle').value,
+    subtitle: document.getElementById('featSubtitle').value,
+    image_url: document.getElementById('featImage').value,
+    link_url: document.getElementById('featLink').value,
+    placement: document.getElementById('featPlacement').value,
+    sort_order: Number(document.getElementById('featSort').value || 0),
+    status: 'active'
+  });
+
+  Toast.show('Featured item created');
+  load('featured');
+};
+
+window.toggleFeatured = async (id, status) => {
+  await API.put(`/admin/featured-items/${id}`, { status });
+  Toast.show('Featured item updated');
+  load('featured');
+};
+
+window.deleteFeatured = async (id) => {
+  await API.del(`/admin/featured-items/${id}`);
+  Toast.show('Featured item deleted');
+  load('featured');
+  bindAdminImageUpload('featImage', 'featImageFile', 'featImagePreview', 'admin-featured');
+};
+
 
   async function loadOverview() {
     const s = await API.get('/admin/overview');
@@ -207,7 +692,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <h3>Create Ad / Post</h3>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="adTitle"></div>
-          <div class="form-group"><label class="form-label">Media URL</label><input class="form-input" id="adMedia"></div>
+          <div class="form-group"><label class="form-label">Media URL</label><input class="form-input" id="adMedia">${adminImageUploadField('adMedia', 'adMediaFile', 'adMediaPreview', 'admin-ads')}</div>
         </div>
         <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="adDesc"></textarea></div>
         <div class="form-row">
@@ -229,6 +714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div><strong>${a.title}</strong> <span class="badge badge-kyc">${a.ad_type} • ${a.target_page}</span><br><span style="font-size:0.85rem;color:var(--text-muted)">${a.status} • ${timeAgo(a.created_at)}</span></div>
         <button class="btn btn-outline btn-sm" onclick="deleteAd('${a.id}')">Delete</button>
       </div></div>`).join('') : '<p style="color:var(--text-muted)">No ads yet.</p>'}`;
+    bindAdminImageUpload('adMedia', 'adMediaFile', 'adMediaPreview', 'admin-ads');
   }
   window.createAd = async () => {
     try {
