@@ -9,7 +9,7 @@ function initSb() {
   if (sb) return Promise.resolve(sb);
   if (sbInitPromise) return sbInitPromise;
   sbInitPromise = new Promise((resolve) => {
-    const getSupabaseFactory = () => window.supabaseJs || window.supabase;
+    const getSupabaseFactory = () => window.supabase;
     const factory = getSupabaseFactory();
     if (factory && SUPABASE_URL && SUPABASE_ANON_KEY) {
       sb = factory.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
