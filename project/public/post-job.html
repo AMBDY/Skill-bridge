@@ -35,7 +35,19 @@
         <div class="form-group"><label class="form-label">State</label><input class="form-input" name="state"></div>
       </div>
       <div class="form-group"><label class="form-label">Location</label><input class="form-input" name="location"></div>
-      <div class="form-group"><label class="form-label">Reference images (comma-separated URLs)</label><input class="form-input" name="reference_images"></div>
+      <div class="form-group">
+  <label class="form-label">Reference images</label>
+  <input class="form-input" name="reference_images" id="referenceImagesInput" placeholder="Paste image URLs separated by commas">
+  <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:18px;text-align:center;margin-top:10px;cursor:pointer" id="referenceDropZone">
+    <div id="referencePlaceholder">
+      <div style="font-size:1.8rem;margin-bottom:6px">🖼️</div>
+      <p style="color:var(--text-soft);font-size:0.9rem">Click to upload reference images</p>
+      <p style="color:var(--text-muted);font-size:0.8rem">You can upload multiple images</p>
+    </div>
+    <input type="file" id="referenceFileInput" accept="image/*" multiple style="display:none">
+  </div>
+  <div id="referencePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+</div>
       <div class="form-group"><label class="form-label">Additional notes</label><textarea class="form-textarea" name="additional_notes"></textarea></div>
       <button type="submit" class="btn btn-gold btn-block btn-lg">Submit for Approval</button>
     </form>
