@@ -446,4 +446,129 @@ router.delete('/featured-items/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/withdrawals', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('withdrawal_requests').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.put('/withdrawals/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { status, admin_note, approval_delay_minutes } = req.body;
+
+  if (!['approved', 'rejected', 'paid', 'held', 'cancelled'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const delayMinutes =
+    approval_delay_minutes === undefined || approval_delay_minutes === null || approval_delay_minutes === ''
+      ? 5
+      : Number(approval_delay_minutes);
+
+  const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+
+  const update = {
+    status,
+    admin_note,
+    reviewed_by: req.user.id,
+    reviewed_at: new Date().toISOString()
+  };
+
+  if (status === 'approved') {
+    update.approval_delay_minutes = delayMinutes;
+    update.approved_at = new Date().toISOString();
+    update.scheduled_for = scheduledFor;
+    update.execution_status = 'scheduled';
+  }
+
+  if (status === 'rejected') {
+    update.execution_status = 'cancelled';
+  }
+
+  if (status === 'held') {
+    update.execution_status = 'held';
+  }
+
+  if (status === 'cancelled') {
+    update.execution_status = 'cancelled';
+  }
+
+  const { data, error } = await c
+    .from('withdrawal_requests')
+    .update(update)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({
+    ...data,
+    message:
+      status === 'approved'
+        ? `Withdrawal approved and scheduled for execution after ${delayMinutes} minutes.`
+        : `Withdrawal marked as ${status}.`
+  });
+});
+
+router.put('/withdrawals/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { status, admin_note, approval_delay_minutes } = req.body;
+
+  if (!['approved', 'rejected', 'paid', 'held', 'cancelled'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const delayMinutes =
+    approval_delay_minutes === undefined || approval_delay_minutes === null || approval_delay_minutes === ''
+      ? 5
+      : Number(approval_delay_minutes);
+
+  const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+
+  const update = {
+    status,
+    admin_note,
+    reviewed_by: req.user.id,
+    reviewed_at: new Date().toISOString()
+  };
+
+  if (status === 'approved') {
+    update.approval_delay_minutes = delayMinutes;
+    update.approved_at = new Date().toISOString();
+    update.scheduled_for = scheduledFor;
+    update.execution_status = 'scheduled';
+  }
+
+  if (status === 'rejected') {
+    update.execution_status = 'cancelled';
+  }
+
+  if (status === 'held') {
+    update.execution_status = 'held';
+  }
+
+  if (status === 'cancelled') {
+    update.execution_status = 'cancelled';
+  }
+
+  const { data, error } = await c
+    .from('withdrawal_requests')
+    .update(update)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({
+    ...data,
+    message:
+      status === 'approved'
+        ? `Withdrawal approved and scheduled for execution after ${delayMinutes} minutes.`
+        : `Withdrawal marked as ${status}.`
+  });
+});
+
 module.exports = router;
