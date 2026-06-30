@@ -3,7 +3,27 @@ const JobsPage = (function () {
   const CAT_ICONS = { 'remote-jobs': '🌐', 'office-jobs': '🏢', 'contract-jobs': '📄', 'hybrid-jobs': '🔀', 'internship': '🎓' };
 
   async function init() {
-    const cats = await API.get('/marketplace/categories?ecosystem=jobs').catch(() => []);
+    const user = Auth.user();
+const actions = document.getElementById('jobPageActions');
+
+if (actions) {
+  if (user && ['client', 'admin'].includes(user.role)) {
+    actions.innerHTML = `
+      <a href="/post-job.html" class="btn btn-gold">+ Post a Job</a>
+      <a href="/dashboard.html#clientJobs" class="btn btn-outline">My Jobs</a>
+    `;
+  } else if (user && ['worker', 'freelancer'].includes(user.role)) {
+    actions.innerHTML = `
+      <a href="/dashboard.html#applicationsSection" class="btn btn-outline">Jobs Applied</a>
+      <a href="/dashboard.html#availableJobsSection" class="btn btn-gold">Available Jobs</a>
+    `;
+  } else {
+    actions.innerHTML = `
+      <a href="/signin.html" class="btn btn-gold">Sign in to apply</a>
+    `;
+  }
+}
+    const cats = await API.get('/marketplace/categories?ecosystem=hire').catch(() => []);
     document.getElementById('catGrid').innerHTML = cats.map(c => `
       <a href="/category.html?ecosystem=jobs&slug=${c.slug}" class="cat-tile">
         <span class="cat-icon">${CAT_ICONS[c.slug] || '💼'}</span>
@@ -31,7 +51,9 @@ const JobsPage = (function () {
           </div>
           <div style="text-align:right">
             <div class="card-price">${fmtPrice(j.budget || j.price_max || 0)}</div>
-            <a href="/job.html?id=${j.id}" class="btn btn-gold btn-sm" style="margin-top:8px">View & Bid</a>
+            <a href="/job.html?id=${j.id}" class="btn btn-gold btn-sm" style="margin-top:8px">
+  ${Auth.user() && ['worker', 'freelancer'].includes(Auth.user().role) ? 'View & Apply' : 'View Job'}
+</a>
           </div>
         </div>
       </div>`).join('');
