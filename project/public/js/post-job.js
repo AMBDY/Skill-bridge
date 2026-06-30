@@ -136,6 +136,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       delete data.reference_images;
     }
 
+    function cleanNumber(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return Number(value);
+}
+
+data.budget = cleanNumber(data.budget);
+data.price_min = cleanNumber(data.price_min);
+data.price_max = cleanNumber(data.price_max);
+
+if (data.budget === null) delete data.budget;
+if (data.price_min === null) delete data.price_min;
+if (data.price_max === null) delete data.price_max;
+
     try {
       await API.post('/jobs', data);
       Toast.show('Job submitted! Awaiting admin approval.');
