@@ -17,6 +17,236 @@ async function profilesByIds(client, ids) {
   return new Map((data || []).map(p => [p.user_id, p]));
 }
 
+async function notifyUser(client, userId, type, title, body, link) {
+  if (!userId) return;
+  await client.from('notifications').insert({
+    user_id: userId,
+    type,
+    title,
+    body,
+    link,
+    read: false
+  });
+}
+
+// Categories
+router.get('/categories', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('categories').select('*').order('ecosystem').order('sort_order');
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/categories', async (req, res) => {
+  const c = authedClient(req);
+  const { name, slug, ecosystem, icon, description, sort_order } = req.body;
+
+  if (!name || !slug || !ecosystem) {
+    return res.status(400).json({ error: 'Name, slug, and ecosystem are required.' });
+  }
+
+  const { data, error } = await c.from('categories').insert({
+    name,
+    slug,
+    ecosystem,
+    icon: icon || null,
+    description: description || null,
+    sort_order: sort_order === '' || sort_order === undefined ? 0 : Number(sort_order)
+  }).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/categories/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('categories').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/categories/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c.from('categories').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Homepage slides
+router.get('/slides', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('homepage_slides').select('*').order('sort_order').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/slides', async (req, res) => {
+  const c = authedClient(req);
+  const { title, subtitle, image_url, cta_label, cta_url, sort_order, status } = req.body;
+
+  if (!image_url) return res.status(400).json({ error: 'Slide image is required.' });
+
+  const { data, error } = await c.from('homepage_slides').insert({
+    title: title || null,
+    subtitle: subtitle || null,
+    image_url,
+    cta_label: cta_label || null,
+    cta_url: cta_url || null,
+    sort_order: sort_order === '' || sort_order === undefined ? 0 : Number(sort_order),
+    status: status || 'active'
+  }).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/slides/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('homepage_slides').update({
+    ...req.body,
+    updated_at: new Date().toISOString()
+  }).eq('id', req.params.id).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/slides/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c.from('homepage_slides').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Site content
+router.get('/site-content', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('site_content').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/site-content', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('site_content').insert(req.body).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/site-content/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('site_content').update({
+    ...req.body,
+    updated_at: new Date().toISOString()
+  }).eq('id', req.params.id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/site-content/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c.from('site_content').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Featured items
+router.get('/featured-items', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('featured_items').select('*').order('sort_order').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/featured-items', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('featured_items').insert(req.body).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.put('/featured-items/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('featured_items').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/featured-items/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c.from('featured_items').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Testimonials, comments, reviews for moderation
+router.get('/testimonials', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('testimonials').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.put('/testimonials/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { status } = req.body;
+  const { data, error } = await c.from('testimonials').update({ status }).eq('id', req.params.id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.get('/comments', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('comments').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.put('/comments/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { status } = req.body;
+  const { data, error } = await c.from('comments').update({ status }).eq('id', req.params.id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.get('/reviews', async (req, res) => {
+  const c = authedClient(req);
+  const { data, error } = await c.from('reviews').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
+// Delete job
+router.delete('/jobs/:id', async (req, res) => {
+  const c = authedClient(req);
+  const { error } = await c.from('jobs').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// AI verify job
+router.post('/jobs/:id/ai-verify', async (req, res) => {
+  const c = authedClient(req);
+  const { data: job, error } = await c.from('jobs').select('*').eq('id', req.params.id).maybeSingle();
+  if (error) return res.status(400).json({ error: error.message });
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+
+  const result = await fetch(`${req.protocol}://${req.get('host')}/api/ai/fraud-check`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: req.headers.authorization
+    },
+    body: JSON.stringify({
+      type: 'job_moderation',
+      data: job
+    })
+  }).then(r => r.json()).catch(() => ({ risk: 'unknown', flags: ['AI check failed'] }));
+
+  res.json(result);
+});
+
 async function attachProfilesByUserId(client, rows, key = 'user_id', outputKey = 'user') {
   if (!rows || !rows.length) return rows || [];
 
@@ -98,8 +328,27 @@ router.get('/jobs', async (req, res) => {
 router.put('/jobs/:id/status', async (req, res) => {
   const c = authedClient(req);
   const { status } = req.body;
-  const { data, error } = await c.from('jobs').update({ status }).eq('id', req.params.id).select().single();
+
+  const updateStatus = status === 'rejected' ? 'rejected' : status;
+
+  const { data, error } = await c
+    .from('jobs')
+    .update({ status: updateStatus })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
   if (error) return res.status(400).json({ error: error.message });
+
+  await notifyUser(
+    c,
+    data.user_id,
+    'job_moderation',
+    `Job ${updateStatus}`,
+    `Your job "${data.title}" was ${updateStatus}.`,
+    `/job.html?id=${data.id}`
+  );
+
   res.json(data);
 });
 
@@ -300,151 +549,6 @@ router.get('/export/:sheet', async (req, res) => {
   res.json({ sheet, rows, exportedAt: new Date().toISOString() });
 });
 
-// Homepage slides
-router.get('/slides', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('homepage_slides')
-    .select('*')
-    .order('sort_order', { ascending: true });
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
-
-router.post('/slides', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('homepage_slides')
-    .insert(req.body)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.put('/slides/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('homepage_slides')
-    .update({ ...req.body, updated_at: new Date().toISOString() })
-    .eq('id', req.params.id)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.delete('/slides/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { error } = await c
-    .from('homepage_slides')
-    .delete()
-    .eq('id', req.params.id);
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ ok: true });
-});
-
-
-// Site content
-router.get('/site-content', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('site_content')
-    .select('*')
-    .order('updated_at', { ascending: false });
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
-
-router.post('/site-content', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('site_content')
-    .insert(req.body)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.put('/site-content/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('site_content')
-    .update({ ...req.body, updated_at: new Date().toISOString() })
-    .eq('id', req.params.id)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.delete('/site-content/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { error } = await c
-    .from('site_content')
-    .delete()
-    .eq('id', req.params.id);
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ ok: true });
-});
-
-
-// Featured items
-router.get('/featured-items', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('featured_items')
-    .select('*')
-    .order('sort_order', { ascending: true });
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
-});
-
-router.post('/featured-items', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('featured_items')
-    .insert(req.body)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.put('/featured-items/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { data, error } = await c
-    .from('featured_items')
-    .update(req.body)
-    .eq('id', req.params.id)
-    .select()
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-router.delete('/featured-items/:id', async (req, res) => {
-  const c = authedClient(req);
-  const { error } = await c
-    .from('featured_items')
-    .delete()
-    .eq('id', req.params.id);
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ ok: true });
-});
 
 router.get('/withdrawals', async (req, res) => {
   const c = authedClient(req);
