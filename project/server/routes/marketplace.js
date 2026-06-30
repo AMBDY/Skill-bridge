@@ -55,7 +55,8 @@ router.post('/services', authMiddleware, async (req, res) => {
   const c = authedClient(req);
   const { category_id, title, description, price, delivery_days, images, video_url } = req.body;
   const { data, error } = await c.from('services').insert({
-    user_id: req.user.id, category_id, title, description, price, delivery_days, images, video_url
+    user_id: req.user.id, category_id, title, description, price, delivery_days, images, video_url, stock: stock ? Number(stock) : 1,
+  status: 'paused'
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
