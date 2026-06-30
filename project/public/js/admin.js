@@ -672,17 +672,61 @@ window.deleteJob = async function (id) {
   }
 };
   
-  async function loadTestimonials() {
-    const items = await API.get('/admin/testimonials');
-    document.getElementById('adminMain').innerHTML = '<h1 class="section-title">Testimonials</h1>' + (items.length ? items.map(function (t) { var u = t.profiles || {}; return '<div class="card" style="margin-top:16px"><div class="card-body"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><strong>' + (u.display_name || 'Member') + '</strong> <span class="badge badge-kyc">' + t.status + '</span><p style="color:var(--text-soft);margin-top:8px">' + t.message + '</p><div class="stars">' + stars(t.rating || 0) + '</div></div><div style="display:flex;gap:8px;align-items:start"><button class="btn btn-gold btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'approved\')">Approve</button><button class="btn btn-outline btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'hidden\')">Hide</button><button class="btn btn-outline btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'rejected\')">Reject</button></div></div></div></div>'; }).join('') : '<p style="color:var(--text-muted);margin-top:24px">No testimonials.</p>');
-  }
-  window.moderateTestimonial = async function (id, status) { await API.put('/admin/testimonials/' + id, { status: status }); Toast.show('Testimonial ' + status); load('testimonials'); };
+ async function loadSocialModeration() {
+  const [testimonials, comments, reviews] = await Promise.all([
+    API.get('/admin/testimonials').catch(() => []),
+    API.get('/admin/comments').catch(() => []),
+    API.get('/admin/reviews').catch(() => [])
+  ]);
 
-  async function loadComments() {
-    const items = await API.get('/admin/comments');
-    document.getElementById('adminMain').innerHTML = '<h1 class="section-title">Comments</h1>' + (items.length ? items.map(function (c) { var u = c.profiles || {}; return '<div class="card" style="margin-top:16px"><div class="card-body"><strong>' + (u.display_name || 'Member') + '</strong> <span class="badge badge-kyc">' + c.status + '</span><p style="color:var(--text-soft);margin:8px 0">' + c.body + '</p><div style="display:flex;gap:8px"><button class="btn btn-gold btn-sm" onclick="moderateComment(\'' + c.id + '\',\'visible\')">Show</button><button class="btn btn-outline btn-sm" onclick="moderateComment(\'' + c.id + '\',\'hidden\')">Hide</button><button class="btn btn-outline btn-sm" onclick="moderateComment(\'' + c.id + '\',\'deleted\')">Delete</button></div></div></div>'; }).join('') : '<p style="color:var(--text-muted);margin-top:24px">No comments.</p>');
-  }
-  window.moderateComment = async function (id, status) { await API.put('/admin/comments/' + id, { status: status }); Toast.show('Comment ' + status); load('comments'); };
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Testimonials, Comments & Reviews</h1>
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Testimonials</h2>
+    ${testimonials.map(t => `
+      <div class="card" style="margin-bottom:10px"><div class="card-body">
+        <strong>${t.name || 'User'}</strong>
+        <p>${t.text || ''}</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-gold btn-sm" onclick="moderateTestimonial('${t.id}','approved')">Approve</button>
+          <button class="btn btn-outline btn-sm" onclick="moderateTestimonial('${t.id}','rejected')">Reject</button>
+        </div>
+      </div></div>
+    `).join('') || '<p style="color:var(--text-muted)">No testimonials.</p>'}
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Comments</h2>
+    ${comments.map(c => `
+      <div class="card" style="margin-bottom:10px"><div class="card-body">
+        <p>${c.body || ''}</p>
+        <div class="card-meta">${c.target_type || ''} | ${c.status || 'pending'}</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-gold btn-sm" onclick="moderateComment('${c.id}','approved')">Approve</button>
+          <button class="btn btn-outline btn-sm" onclick="moderateComment('${c.id}','rejected')">Reject</button>
+        </div>
+      </div></div>
+    `).join('') || '<p style="color:var(--text-muted)">No comments.</p>'}
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Reviews</h2>
+    ${reviews.map(r => `
+      <div class="card" style="margin-bottom:10px"><div class="card-body">
+        <strong>${r.stars} stars</strong>
+        <p>${r.comment || ''}</p>
+      </div></div>
+    `).join('') || '<p style="color:var(--text-muted)">No reviews.</p>'}
+  `;
+}
+
+window.moderateTestimonial = async function (id, status) {
+  await API.put(`/admin/testimonials/${id}`, { status });
+  Toast.show('Testimonial ' + status);
+  await loadSocialModeration();
+};
+
+window.moderateComment = async function (id, status) {
+  await API.put(`/admin/comments/${id}`, { status });
+  Toast.show('Comment ' + status);
+  await loadSocialModeration();
+};
 
   async function loadReviews() {
     const items = await API.get('/admin/reviews');
