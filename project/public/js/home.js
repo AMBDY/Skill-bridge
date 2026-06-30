@@ -36,29 +36,36 @@ const RECENT_JOBS = [
 async function initHero() {
   const hero = document.getElementById('hero');
   const dots = document.getElementById('heroDots');
+  if (!hero || !dots) return;
 
   let slides = [];
 
   try {
-    slides = await API.get('/marketplace/cms/slides');
-  } catch (err) {
+    const cmsSlides = await API.get('/marketplace/cms/slides');
+    slides = (cmsSlides || [])
+      .filter(s => s.image_url)
+      .map(s => ({
+        image: s.image_url,
+        title: s.title || '',
+        subtitle: s.subtitle || '',
+        cta_label: s.cta_label || '',
+        cta_url: s.cta_url || ''
+      }));
+  } catch {
     slides = [];
   }
 
   if (!slides.length) {
-    slides = HERO_SLIDES.map((url, i) => ({
-      image_url: url,
-      title: i === 0 ? 'Where African Talent Meets Opportunity' : '',
-      subtitle: '',
-      cta_label: '',
-      cta_url: ''
-    }));
+    slides = HERO_SLIDES.map(url => ({ image: url }));
   }
+
+  dots.innerHTML = '';
+  hero.querySelectorAll('.hero-slide').forEach(el => el.remove());
 
   slides.forEach((item, i) => {
     const slide = document.createElement('div');
     slide.className = 'hero-slide' + (i === 0 ? ' active' : '');
-    slide.style.backgroundImage = `url('${item.image_url}')`;
+    slide.style.backgroundImage = `url("${item.image}")`;
     hero.insertBefore(slide, hero.firstChild);
 
     const dot = document.createElement('div');
@@ -73,15 +80,15 @@ async function initHero() {
     document.querySelectorAll('.hero-slide').forEach((s, idx) => {
       s.classList.toggle('active', idx === i);
     });
-
     document.querySelectorAll('.hero-dot').forEach((d, idx) => {
       d.classList.toggle('active', idx === i);
     });
-
     cur = i;
   }
 
-  setInterval(() => goTo((cur + 1) % slides.length), 5000);
+  if (slides.length > 1) {
+    setInterval(() => goTo((cur + 1) % slides.length), 5000);
+  }
 }
 
 function renderFeaturedCats() {
@@ -142,8 +149,8 @@ function renderWOTD() {
   document.getElementById('wotdDef').textContent = w.def;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  initHero();
+document.addEventListener('DOMContentLoaded', async () => {
+  await initHero();
   renderFeaturedCats();
   renderTopSellers();
   renderRecentJobs();
