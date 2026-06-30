@@ -12,6 +12,7 @@ const chatRoutes = require('./routes/chat');
 const paymentRoutes = require('./routes/payments');
 const adminRoutes = require('./routes/admin');
 const aiRoutes = require('./routes/ai');
+const recruitmentRoutes = require('./routes/recruitment');
 const { initChatSockets } = require('./sockets/chat');
 const { supabase, hasSupabaseConfig } = require('./utils/db');
 
@@ -50,6 +51,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/recruitment', recruitmentRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'skillbridge', supabaseConfigured: hasSupabaseConfig }));
 
 // Serve HTML files with Supabase config injected
