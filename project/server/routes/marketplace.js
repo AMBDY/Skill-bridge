@@ -376,4 +376,80 @@ router.post('/comments', authMiddleware, async (req, res) => {
   res.json(data);
 });
 
+router.get('/search', async (req, res) => {
+  const term = String(req.query.q || '').trim();
+
+  if (!term) {
+    return res.json({
+      categories: [],
+      products: [],
+      services: [],
+      jobs: []
+    });
+  }
+
+  const like = `%${term}%`;
+
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('*')
+    .or(`name.ilike.${like},slug.ilike.${like},description.ilike.${like}`)
+    .limit(20);
+
+  const categoryIds = (categories || []).map(c => c.id);
+
+  let productQuery = supabase
+    .from('products')
+    .select('*')
+    .eq('status', 'active');
+
+  productQuery = categoryIds.length
+    ? productQuery.or(`title.ilike.${like},description.ilike.${like},category_id.in.(${categoryIds.join(',')})`)
+    : productQuery.or(`title.ilike.${like},description.ilike.${like}`);
+
+  let serviceQuery = supabase
+    .from('services')
+    .select('*')
+    .eq('status', 'active');
+
+  serviceQuery = categoryIds.length
+    ? serviceQuery.or(`title.ilike.${like},description.ilike.${like},category_id.in.(${categoryIds.join(',')})`)
+    : serviceQuery.or(`title.ilike.${like},description.ilike.${like}`);
+
+  let jobQuery = supabase
+    .from('jobs')
+    .select('*')
+    .in('status', ['approved', 'open', 'assigned', 'completed']);
+
+  jobQuery = categoryIds.length
+    ? jobQuery.or(`title.ilike.${like},description.ilike.${like},location.ilike.${like},state.ilike.${like},category_id.in.(${categoryIds.join(',')})`)
+    : jobQuery.or(`title.ilike.${like},description.ilike.${like},location.ilike.${like},state.ilike.${like}`);
+
+  const [productsRes, servicesRes, jobsRes] = await Promise.all([
+    productQuery.order('created_at', { ascending: false }).limit(30),
+    serviceQuery.order('created_at', { ascending: false }).limit(30),
+    jobQuery.order('created_at', { ascending: false }).limit(30)
+  ]);
+
+  let products = productsRes.data || [];
+  let services = servicesRes.data || [];
+  let jobs = jobsRes.data || [];
+
+  products = await attachProfiles(products, 'user_id');
+  products = await attachCategories(products, 'category_id');
+
+  services = await attachProfiles(services, 'user_id');
+  services = await attachCategories(services, 'category_id');
+
+  jobs = await attachProfiles(jobs, 'user_id');
+  jobs = await attachCategories(jobs, 'category_id');
+
+  res.json({
+    categories: categories || [],
+    products,
+    services,
+    jobs
+  });
+});
+
 module.exports = router;
