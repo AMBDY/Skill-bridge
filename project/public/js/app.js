@@ -325,6 +325,7 @@ function renderNav() {
 
         ${logged ? `
           <a href="/chat.html" class="icon-btn" title="Messages">💬</a>
+          <a href="/recruitment-jobs.html" class="btn btn-outline btn-sm">Job Recruitment</a>
           <a href="/dashboard.html" class="btn btn-outline btn-sm">Dashboard</a>
           ${user && user.role === 'admin' ? '<a href="/admin.html" class="btn btn-gold btn-sm">Admin</a>' : ''}
           <button class="btn btn-primary btn-sm" id="logoutBtn">Sign out</button>
