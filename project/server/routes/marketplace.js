@@ -79,11 +79,42 @@ router.get('/products', async (req, res) => {
 });
 
 router.post('/products', authMiddleware, async (req, res) => {
+  if (!['seller', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only sellers can upload products.' });
+  }
+
   const c = authedClient(req);
-  const { category_id, title, description, price, size, color, gender, images, video_url, stock } = req.body;
+  const {
+    category_id,
+    title,
+    description,
+    price,
+    size,
+    color,
+    gender,
+    images,
+    video_url,
+    stock
+  } = req.body;
+
+  const cleanPrice = price === '' || price === undefined || price === null ? 0 : Number(price);
+  const cleanStock = stock === '' || stock === undefined || stock === null ? 1 : Number(stock);
+
   const { data, error } = await c.from('products').insert({
-    user_id: req.user.id, category_id, title, description, price, size, color, gender, images, video_url, stock
+    user_id: req.user.id,
+    category_id,
+    title,
+    description,
+    price: cleanPrice,
+    size: size || null,
+    color: color || null,
+    gender: gender || null,
+    images: Array.isArray(images) ? images : [],
+    video_url: video_url || null,
+    stock: cleanStock,
+    status: 'paused'
   }).select().single();
+
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
