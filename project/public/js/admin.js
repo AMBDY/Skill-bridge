@@ -15,8 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   { id: 'users', label: 'Users' },
   { id: 'kyc', label: 'KYC Review' },
   { id: 'jobs', label: 'Job Moderation' },
-  { id: 'testimonials', label: 'Testimonials' },
-  { id: 'comments', label: 'Comments' },
+  { id: 'socialModeration', label: 'Testimonials & Comments' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'disputes', label: 'Disputes' },
   { id: 'payments', label: 'Payments' },
@@ -44,15 +43,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     main.innerHTML = '<div class="skeleton" style="height:200px"></div>';
     try {
       if (sec === 'overview') return await loadOverview();
-      if (sec === 'slides') return await loadSlides();
-      if (sec === 'siteContent') return await loadSiteContent();
-      if (sec === 'featured') return await loadFeatured();
       if (sec === 'categories') return await loadCategoriesAdmin();
+      if (sec === 'slides') return await loadSlidesAdmin();
+      if (sec === 'siteContent') return await loadSiteContentAdmin();
+      if (sec === 'featured') return await loadFeaturedAdmin();
+      if (sec === 'socialModeration') return await loadSocialModeration();
       if (sec === 'users') return await loadUsers();
       if (sec === 'kyc') return await loadKyc();
       if (sec === 'jobs') return await loadJobs();
-      if (sec === 'testimonials') return await loadTestimonials();
-      if (sec === 'comments') return await loadComments();
       if (sec === 'reviews') return await loadReviews();
       if (sec === 'disputes') return await loadDisputes();
       if (sec === 'payments') return await loadPayments();
@@ -68,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) { main.innerHTML = `<p>Error: ${e.message}</p>`; }
   }
 
-  async function loadSlides() {
+  async function loadSlidesAdmin() {
   const slides = await API.get('/admin/slides');
 
   document.getElementById('adminMain').innerHTML = `
@@ -76,111 +74,65 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     <div class="card" style="margin:24px 0">
       <div class="card-body">
-        <h3>Add Slide</h3>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Title</label>
-            <input class="form-input" id="slideTitle">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Sort Order</label>
-            <input class="form-input" type="number" id="slideSort" value="0">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Subtitle</label>
-          <textarea class="form-textarea" id="slideSubtitle"></textarea>
-        </div>
+        <h3>Create Slide</h3>
 
         <div class="form-group">
           <label class="form-label">Image URL</label>
           <input class="form-input" id="slideImage">
-          ${adminImageUploadField('slideImage', 'slideImageFile', 'slideImagePreview', 'admin-slides')}
+          ${adminImageField('slideImage', 'slideImageFile', 'slideImagePreview')}
         </div>
 
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">CTA Label</label>
-            <input class="form-input" id="slideCtaLabel">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">CTA URL</label>
-            <input class="form-input" id="slideCtaUrl">
-          </div>
+          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="slideTitle"></div>
+          <div class="form-group"><label class="form-label">Sort Order</label><input class="form-input" type="number" id="slideSort" value="0"></div>
         </div>
+
+        <div class="form-group"><label class="form-label">Subtitle</label><textarea class="form-textarea" id="slideSubtitle"></textarea></div>
 
         <button class="btn btn-gold" onclick="createSlide()">Create Slide</button>
       </div>
     </div>
 
-    <div class="grid grid-3">
-      ${slides.map(s => `
-        <div class="card">
-          <div class="card-img">
-            <img src="${s.image_url}" alt="${s.title || 'Slide'}">
+    ${slides.map(s => `
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-body" style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap">
+          <div style="display:flex;gap:12px">
+            <img src="${s.image_url}" style="width:100px;height:70px;object-fit:cover;border-radius:8px">
+            <div><strong>${s.title || 'Slide'}</strong><div class="card-meta">${s.status}</div></div>
           </div>
-
-          <div class="card-body">
-            <h3>${s.title || 'Untitled slide'}</h3>
-            <p style="color:var(--text-soft);font-size:0.9rem">${s.subtitle || ''}</p>
-            <div class="card-meta">
-              <span>${s.status}</span>
-              <span>Order: ${s.sort_order}</span>
-            </div>
-
-            <div style="display:flex;gap:8px;margin-top:12px">
-              <button class="btn btn-outline btn-sm" onclick="toggleSlide('${s.id}', '${s.status === 'active' ? 'paused' : 'active'}')">
-                ${s.status === 'active' ? 'Pause' : 'Activate'}
-              </button>
-
-              <button class="btn btn-outline btn-sm" onclick="deleteSlide('${s.id}')">
-                Delete
-              </button>
-            </div>
-          </div>
+          <button class="btn btn-outline btn-sm" onclick="deleteSlide('${s.id}')">Delete</button>
         </div>
-      `).join('')}
-    </div>
+      </div>
+    `).join('')}
   `;
+
+  bindAdminImage('slideImage', 'slideImageFile', 'slideImagePreview', 'admin-slides');
 }
 
-window.createSlide = async () => {
+window.createSlide = async function () {
   try {
     await API.post('/admin/slides', {
+      image_url: document.getElementById('slideImage').value.trim(),
       title: document.getElementById('slideTitle').value,
       subtitle: document.getElementById('slideSubtitle').value,
-      image_url: document.getElementById('slideImage').value,
-      cta_label: document.getElementById('slideCtaLabel').value,
-      cta_url: document.getElementById('slideCtaUrl').value,
       sort_order: Number(document.getElementById('slideSort').value || 0),
       status: 'active'
     });
 
     Toast.show('Slide created');
-    load('slides');
-  } catch (e) {
-    Toast.show(e.message);
+    await loadSlidesAdmin();
+  } catch (err) {
+    Toast.show(err.message);
   }
 };
 
-window.toggleSlide = async (id, status) => {
-  await API.put(`/admin/slides/${id}`, { status });
-  Toast.show('Slide updated');
-  load('slides');
-};
-
-window.deleteSlide = async (id) => {
+window.deleteSlide = async function (id) {
   await API.del(`/admin/slides/${id}`);
   Toast.show('Slide deleted');
-  load('slides');
-  bindAdminImageUpload('slideImage', 'slideImageFile', 'slideImagePreview', 'admin-slides');
+  await loadSlidesAdmin();
 };
 
-  async function loadSiteContent() {
+  async function loadSiteContentAdmin() {
   const items = await API.get('/admin/site-content');
 
   document.getElementById('adminMain').innerHTML = `
@@ -188,17 +140,24 @@ window.deleteSlide = async (id) => {
 
     <div class="card" style="margin:24px 0">
       <div class="card-body">
-        <h3>Add Content Block</h3>
+        <h3>Create Site Content</h3>
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Content Key</label>
-            <input class="form-input" id="contentKey" placeholder="homepage_mission">
+            <input class="form-input" id="contentKey" placeholder="home_intro">
           </div>
 
           <div class="form-group">
             <label class="form-label">Target Page</label>
-            <input class="form-input" id="contentPage" value="homepage">
+            <select class="form-select" id="contentTargetPage">
+              <option value="home">Home</option>
+              <option value="about">About</option>
+              <option value="jobs">Jobs</option>
+              <option value="shop">Shop</option>
+              <option value="hire">Hire</option>
+              <option value="all">All Pages</option>
+            </select>
           </div>
         </div>
 
@@ -215,79 +174,118 @@ window.deleteSlide = async (id) => {
         <div class="form-group">
           <label class="form-label">Media URL</label>
           <input class="form-input" id="contentMedia">
-          ${adminImageUploadField('contentMedia', 'contentMediaFile', 'contentMediaPreview', 'admin-content')}
+          ${adminImageField('contentMedia', 'contentMediaFile', 'contentMediaPreview')}
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Link Label</label>
+            <input class="form-input" id="contentLinkLabel">
+          </div>
 
           <div class="form-group">
             <label class="form-label">Link URL</label>
-            <input class="form-input" id="contentLink">
+            <input class="form-input" id="contentLinkUrl">
           </div>
         </div>
 
-        <button class="btn btn-gold" onclick="createContentBlock()">Create Content</button>
+        <button class="btn btn-gold" onclick="createSiteContent()">Create Content</button>
       </div>
     </div>
 
-    ${items.map(item => `
-      <div class="card" style="margin-top:12px">
-        <div class="card-body">
-          <strong>${item.content_key}</strong>
-          <h3>${item.title || ''}</h3>
-          <p style="color:var(--text-soft)">${item.body || ''}</p>
-          <span class="badge badge-kyc">${item.status}</span>
+    <h3>Existing Content</h3>
 
-          <div style="display:flex;gap:8px;margin-top:12px">
-            <button class="btn btn-outline btn-sm" onclick="toggleContent('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
+    ${items.length ? items.map(item => `
+      <div class="card" style="margin-top:12px">
+        <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            ${item.media_url ? `
+              <img src="${item.media_url}" style="width:100px;height:70px;object-fit:cover;border-radius:8px">
+            ` : ''}
+
+            <div>
+              <strong>${item.title || item.content_key || 'Content'}</strong>
+              <div class="card-meta">
+                ${item.content_key || 'no-key'} | ${item.target_page || 'home'} | ${item.status || 'active'}
+              </div>
+              <p style="color:var(--text-soft);font-size:0.9rem;margin-top:6px">${item.body || ''}</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="toggleSiteContent('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
               ${item.status === 'active' ? 'Pause' : 'Activate'}
             </button>
 
-            <button class="btn btn-outline btn-sm" onclick="deleteContent('${item.id}')">
+            <button class="btn btn-ghost btn-sm" onclick="deleteSiteContent('${item.id}')">
               Delete
             </button>
           </div>
         </div>
       </div>
-    `).join('')}
+    `).join('') : '<p style="color:var(--text-muted)">No site content yet.</p>'}
   `;
+
+  bindAdminImage('contentMedia', 'contentMediaFile', 'contentMediaPreview', 'admin-content');
 }
 
-window.createContentBlock = async () => {
-  await API.post('/admin/site-content', {
-    content_key: document.getElementById('contentKey').value,
-    title: document.getElementById('contentTitle').value,
-    body: document.getElementById('contentBody').value,
-    media_url: document.getElementById('contentMedia').value,
-    link_url: document.getElementById('contentLink').value,
-    target_page: document.getElementById('contentPage').value,
-    status: 'active'
-  });
+window.createSiteContent = async function () {
+  try {
+    const content_key = document.getElementById('contentKey').value.trim();
+    const title = document.getElementById('contentTitle').value.trim();
 
-  Toast.show('Content created');
-  load('siteContent');
+    if (!content_key) return Toast.show('Content key is required');
+    if (!title) return Toast.show('Title is required');
+
+    await API.post('/admin/site-content', {
+      content_key,
+      title,
+      body: document.getElementById('contentBody').value,
+      media_url: document.getElementById('contentMedia').value.trim() || null,
+      link_label: document.getElementById('contentLinkLabel').value.trim() || null,
+      link_url: document.getElementById('contentLinkUrl').value.trim() || null,
+      target_page: document.getElementById('contentTargetPage').value,
+      status: 'active'
+    });
+
+    Toast.show('Site content created');
+    await loadSiteContentAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-window.toggleContent = async (id, status) => {
-  await API.put(`/admin/site-content/${id}`, { status });
-  Toast.show('Content updated');
-  load('siteContent');
+window.toggleSiteContent = async function (id, status) {
+  try {
+    await API.put(`/admin/site-content/${id}`, { status });
+    Toast.show('Content updated');
+    await loadSiteContentAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-window.deleteContent = async (id) => {
-  await API.del(`/admin/site-content/${id}`);
-  Toast.show('Content deleted');
-  load('siteContent');
-  bindAdminImageUpload('contentMedia', 'contentMediaFile', 'contentMediaPreview', 'admin-content');
+window.deleteSiteContent = async function (id) {
+  if (!confirm('Delete this content?')) return;
+
+  try {
+    await API.del(`/admin/site-content/${id}`);
+    Toast.show('Content deleted');
+    await loadSiteContentAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
   async function loadCategoriesAdmin() {
-  const cats = await API.get('/marketplace/categories');
+  const cats = await API.get('/admin/categories');
 
   document.getElementById('adminMain').innerHTML = `
     <h1 class="section-title">Categories</h1>
 
     <div class="card" style="margin:24px 0">
       <div class="card-body">
-        <h3>Add Category</h3>
+        <h3>Create Category</h3>
 
         <div class="form-row">
           <div class="form-group">
@@ -297,7 +295,7 @@ window.deleteContent = async (id) => {
 
           <div class="form-group">
             <label class="form-label">Slug</label>
-            <input class="form-input" id="catSlug">
+            <input class="form-input" id="catSlug" placeholder="web-design">
           </div>
         </div>
 
@@ -305,9 +303,9 @@ window.deleteContent = async (id) => {
           <div class="form-group">
             <label class="form-label">Ecosystem</label>
             <select class="form-select" id="catEco">
-              <option value="hire">Hire Talent</option>
-              <option value="shop">Shop Products</option>
-              <option value="jobs">Find Jobs</option>
+              <option value="hire">Hire</option>
+              <option value="shop">Shop</option>
+              <option value="jobs">Jobs</option>
             </select>
           </div>
 
@@ -326,109 +324,53 @@ window.deleteContent = async (id) => {
       </div>
     </div>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Slug</th>
-          <th>Ecosystem</th>
-          <th>Sort</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        ${cats.map(c => `
-          <tr>
-            <td>${c.name}</td>
-            <td>${c.slug}</td>
-            <td>${c.ecosystem}</td>
-            <td>${c.sort_order}</td>
-            <td>
-              <button class="btn btn-outline btn-sm" onclick="deleteCategory('${c.id}')">Delete</button>
-            </td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+    ${cats.map(c => `
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>${c.name}</strong>
+            <div class="card-meta">${c.ecosystem} | ${c.slug}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="deleteCategory('${c.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('')}
   `;
 }
 
-window.createCategory = async () => {
-  await API.post('/admin/categories', {
-    name: document.getElementById('catName').value,
-    slug: document.getElementById('catSlug').value,
-    ecosystem: document.getElementById('catEco').value,
-    description: document.getElementById('catDesc').value,
-    sort_order: Number(document.getElementById('catSort').value || 0)
-  });
+window.createCategory = async function () {
+  try {
+    const name = document.getElementById('catName').value.trim();
+    const slug = document.getElementById('catSlug').value.trim().toLowerCase().replace(/\s+/g, '-');
 
-  Toast.show('Category created');
-  load('categories');
+    if (!name || !slug) return Toast.show('Name and slug are required');
+
+    await API.post('/admin/categories', {
+      name,
+      slug,
+      ecosystem: document.getElementById('catEco').value,
+      description: document.getElementById('catDesc').value,
+      sort_order: Number(document.getElementById('catSort').value || 0)
+    });
+
+    Toast.show('Category created');
+    await loadCategoriesAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-window.deleteCategory = async (id) => {
-  await API.del(`/admin/categories/${id}`);
-  Toast.show('Category deleted');
-  load('categories');
+window.deleteCategory = async function (id) {
+  try {
+    await API.del(`/admin/categories/${id}`);
+    Toast.show('Category deleted');
+    await loadCategoriesAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-  function adminImageUploadField(inputId, fileId, previewId, folder = 'admin-media') {
-  return `
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
-      <input type="file" id="${fileId}" accept="image/*" style="display:none">
-      <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('${fileId}').click()">
-        Upload Image
-      </button>
-      <span style="color:var(--text-muted);font-size:0.82rem">or paste image URL above</span>
-    </div>
-    <div id="${previewId}" style="margin-top:10px"></div>
-  `;
-}
-
-window.bindAdminImageUpload = function (inputId, fileId, previewId, folder = 'admin-media') {
-  const fileInput = document.getElementById(fileId);
-  const urlInput = document.getElementById(inputId);
-  const preview = document.getElementById(previewId);
-
-  if (!fileInput || !urlInput) return;
-
-  fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      Toast.show('Please select an image file');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      Toast.show('Image must be under 5MB');
-      return;
-    }
-
-    try {
-      Toast.show('Uploading image...');
-      const url = await uploadImage(file, folder);
-      urlInput.value = url;
-
-      if (preview) {
-        preview.innerHTML = `
-          <img src="${url}" style="width:160px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
-        `;
-      }
-
-      Toast.show('Image uploaded');
-    } catch (err) {
-      Toast.show('Upload failed: ' + err.message);
-    } finally {
-      fileInput.value = '';
-    }
-  });
-};
-
-  async function loadFeatured() {
+ async function loadFeaturedAdmin() {
   const items = await API.get('/admin/featured-items');
 
   document.getElementById('adminMain').innerHTML = `
@@ -436,115 +378,152 @@ window.bindAdminImageUpload = function (inputId, fileId, previewId, folder = 'ad
 
     <div class="card" style="margin:24px 0">
       <div class="card-body">
-        <h3>Add Featured Item</h3>
+        <h3>Create Featured Item</h3>
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Item Type</label>
-            <select class="form-select" id="featType">
-              <option value="service">Service</option>
-              <option value="product">Product</option>
+            <select class="form-select" id="featuredType">
+              <option value="custom">Custom</option>
               <option value="job">Job</option>
-              <option value="seller">Seller</option>
-              <option value="freelancer">Freelancer</option>
-              <option value="category">Category</option>
+              <option value="product">Product</option>
+              <option value="service">Service</option>
             </select>
           </div>
 
           <div class="form-group">
             <label class="form-label">Placement</label>
-            <input class="form-input" id="featPlacement" value="homepage">
+            <select class="form-select" id="featuredPlacement">
+              <option value="home">Home</option>
+              <option value="jobs">Jobs</option>
+              <option value="shop">Shop</option>
+              <option value="hire">Hire</option>
+              <option value="all">All Pages</option>
+            </select>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Title</label>
-            <input class="form-input" id="featTitle">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Linked Item ID optional</label>
+          <input class="form-input" id="featuredItemId" placeholder="Product/job/service id if needed">
+        </div>
 
-          <div class="form-group">
-            <label class="form-label">Sort Order</label>
-            <input class="form-input" type="number" id="featSort" value="0">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input class="form-input" id="featuredTitle">
         </div>
 
         <div class="form-group">
           <label class="form-label">Subtitle</label>
-          <textarea class="form-textarea" id="featSubtitle"></textarea>
+          <textarea class="form-textarea" id="featuredSubtitle"></textarea>
         </div>
 
         <div class="form-group">
           <label class="form-label">Image URL</label>
-          <input class="form-input" id="featImage">
-          ${adminImageUploadField('featImage', 'featImageFile', 'featImagePreview', 'admin-featured')}
+          <input class="form-input" id="featuredImage">
+          ${adminImageField('featuredImage', 'featuredImageFile', 'featuredImagePreview')}
         </div>
 
+        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Link URL</label>
-            <input class="form-input" id="featLink">
+            <input class="form-input" id="featuredLink">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input class="form-input" type="number" id="featuredSort" value="0">
           </div>
         </div>
 
-        <button class="btn btn-gold" onclick="createFeatured()">Create Featured Item</button>
+        <button class="btn btn-gold" onclick="createFeaturedItem()">Create Featured Item</button>
       </div>
     </div>
 
-    <div class="grid grid-3">
-      ${items.map(item => `
-        <div class="card">
-          ${item.image_url ? `<div class="card-img"><img src="${item.image_url}"></div>` : ''}
-          <div class="card-body">
-            <span class="badge badge-kyc">${item.item_type}</span>
-            <h3>${item.title || 'Untitled'}</h3>
-            <p style="color:var(--text-soft)">${item.subtitle || ''}</p>
+    <h3>Existing Featured Items</h3>
 
-            <div style="display:flex;gap:8px;margin-top:12px">
-              <button class="btn btn-outline btn-sm" onclick="toggleFeatured('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
-                ${item.status === 'active' ? 'Pause' : 'Activate'}
-              </button>
+    ${items.length ? items.map(item => `
+      <div class="card" style="margin-top:12px">
+        <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            ${item.image_url ? `
+              <img src="${item.image_url}" style="width:100px;height:70px;object-fit:cover;border-radius:8px">
+            ` : ''}
 
-              <button class="btn btn-outline btn-sm" onclick="deleteFeatured('${item.id}')">
-                Delete
-              </button>
+            <div>
+              <strong>${item.title || 'Featured Item'}</strong>
+              <div class="card-meta">
+                ${item.item_type || 'custom'} | ${item.placement || 'home'} | ${item.status || 'active'}
+              </div>
+              <p style="color:var(--text-soft);font-size:0.9rem;margin-top:6px">${item.subtitle || ''}</p>
             </div>
           </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="toggleFeaturedItem('${item.id}', '${item.status === 'active' ? 'paused' : 'active'}')">
+              ${item.status === 'active' ? 'Pause' : 'Activate'}
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="deleteFeaturedItem('${item.id}')">
+              Delete
+            </button>
+          </div>
         </div>
-      `).join('')}
-    </div>
+      </div>
+    `).join('') : '<p style="color:var(--text-muted)">No featured items yet.</p>'}
   `;
+
+  bindAdminImage('featuredImage', 'featuredImageFile', 'featuredImagePreview', 'admin-featured');
 }
 
-window.createFeatured = async () => {
-  await API.post('/admin/featured-items', {
-    item_type: document.getElementById('featType').value,
-    title: document.getElementById('featTitle').value,
-    subtitle: document.getElementById('featSubtitle').value,
-    image_url: document.getElementById('featImage').value,
-    link_url: document.getElementById('featLink').value,
-    placement: document.getElementById('featPlacement').value,
-    sort_order: Number(document.getElementById('featSort').value || 0),
-    status: 'active'
-  });
+window.createFeaturedItem = async function () {
+  try {
+    const title = document.getElementById('featuredTitle').value.trim();
 
-  Toast.show('Featured item created');
-  load('featured');
+    if (!title) return Toast.show('Title is required');
+
+    const itemId = document.getElementById('featuredItemId').value.trim();
+
+    await API.post('/admin/featured-items', {
+      item_type: document.getElementById('featuredType').value,
+      item_id: itemId || null,
+      title,
+      subtitle: document.getElementById('featuredSubtitle').value,
+      image_url: document.getElementById('featuredImage').value.trim() || null,
+      link_url: document.getElementById('featuredLink').value.trim() || null,
+      placement: document.getElementById('featuredPlacement').value,
+      sort_order: Number(document.getElementById('featuredSort').value || 0),
+      status: 'active'
+    });
+
+    Toast.show('Featured item created');
+    await loadFeaturedAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-window.toggleFeatured = async (id, status) => {
-  await API.put(`/admin/featured-items/${id}`, { status });
-  Toast.show('Featured item updated');
-  load('featured');
+window.toggleFeaturedItem = async function (id, status) {
+  try {
+    await API.put(`/admin/featured-items/${id}`, { status });
+    Toast.show('Featured item updated');
+    await loadFeaturedAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
 
-window.deleteFeatured = async (id) => {
-  await API.del(`/admin/featured-items/${id}`);
-  Toast.show('Featured item deleted');
-  load('featured');
-  bindAdminImageUpload('featImage', 'featImageFile', 'featImagePreview', 'admin-featured');
+window.deleteFeaturedItem = async function (id) {
+  if (!confirm('Delete this featured item?')) return;
+
+  try {
+    await API.del(`/admin/featured-items/${id}`);
+    Toast.show('Featured item deleted');
+    await loadFeaturedAdmin();
+  } catch (err) {
+    Toast.show(err.message);
+  }
 };
-
-
   async function loadOverview() {
     const s = await API.get('/admin/overview');
     document.getElementById('adminMain').innerHTML = `
@@ -589,17 +568,110 @@ window.deleteFeatured = async (id) => {
   window.reviewKyc = async (id, status) => { await API.put(`/admin/kyc/${id}`, { status }); Toast.show('KYC ' + status); load('kyc'); };
 
   async function loadJobs() {
-    const jobs = await API.get('/admin/jobs');
-    document.getElementById('adminMain').innerHTML = `
-      <h1 class="section-title">Job Moderation</h1>
-      <table class="table" style="margin-top:24px"><thead><tr><th>Title</th><th>Client</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      ${jobs.map(j => `<tr><td>${j.title}</td><td>${j.profiles?.display_name || ''}</td><td><span class="badge badge-kyc">${j.status}</span></td>
-        <td><button class="btn btn-gold btn-sm" onclick="setJobStatus('${j.id}','approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="setJobStatus('${j.id}','cancelled')">Reject</button></td></tr>`).join('')}
-      </tbody></table>`;
+  const jobs = await API.get('/admin/jobs');
+
+  const pending = jobs.filter(j => !['approved', 'rejected', 'cancelled'].includes(j.status));
+  const approved = jobs.filter(j => j.status === 'approved' || j.status === 'open');
+  const rejected = jobs.filter(j => j.status === 'rejected' || j.status === 'cancelled');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Job Moderation</h1>
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Pending Jobs</h2>
+    ${pending.length ? pending.map(jobModerationCard).join('') : '<p style="color:var(--text-muted)">No pending jobs.</p>'}
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Approved Jobs</h2>
+    ${approved.length ? approved.map(jobModerationCard).join('') : '<p style="color:var(--text-muted)">No approved jobs.</p>'}
+
+    <h2 style="font-size:1.4rem;margin:24px 0 12px">Rejected Jobs</h2>
+    ${rejected.length ? rejected.map(jobModerationCard).join('') : '<p style="color:var(--text-muted)">No rejected jobs.</p>'}
+  `;
+}
+
+function jobModerationCard(j) {
+  const isApproved = j.status === 'approved' || j.status === 'open';
+  const isRejected = j.status === 'rejected' || j.status === 'cancelled';
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>${j.title}</strong>
+            <div class="card-meta">
+              Client: ${j.profiles?.display_name || 'Unknown'} | Status: ${j.status} | Budget: ${fmtPrice(j.budget || 0)}
+            </div>
+          </div>
+          <span class="badge badge-kyc">${j.status}</span>
+        </div>
+
+        <div style="margin-top:12px;color:var(--text-soft);white-space:pre-wrap">
+          ${j.description || 'No description'}
+        </div>
+
+        <div style="margin-top:10px;color:var(--text-muted);font-size:0.85rem">
+          Location: ${j.location || j.state || 'N/A'} | Duration: ${j.duration || 'Flexible'} | Type: ${j.job_type || 'N/A'}
+        </div>
+
+        ${j.reference_images && j.reference_images.length ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${j.reference_images.map(url => `<img src="${url}" style="width:90px;height:70px;object-fit:cover;border-radius:8px">`).join('')}
+          </div>
+        ` : ''}
+
+        <div id="aiJobResult_${j.id}" style="margin-top:10px"></div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          ${!isApproved ? `<button class="btn btn-gold btn-sm" onclick="setJobStatus('${j.id}','approved')">Approve</button>` : ''}
+          ${!isRejected ? `<button class="btn btn-outline btn-sm" onclick="setJobStatus('${j.id}','rejected')">Reject</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick="aiVerifyJob('${j.id}')">Verify With AI</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteJob('${j.id}')">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.setJobStatus = async function (id, status) {
+  try {
+    await API.put(`/admin/jobs/${id}/status`, { status });
+    Toast.show('Job ' + status);
+    await loadJobs();
+  } catch (err) {
+    Toast.show(err.message);
   }
-  window.setJobStatus = async (id, status) => { await API.put(`/admin/jobs/${id}/status`, { status }); Toast.show('Job ' + status); load('jobs'); };
+};
 
+window.aiVerifyJob = async function (id) {
+  try {
+    const result = await API.post(`/admin/jobs/${id}/ai-verify`, {});
+    const box = document.getElementById(`aiJobResult_${id}`);
+    box.innerHTML = `
+      <div class="card" style="margin-top:8px">
+        <div class="card-body">
+          <strong>AI Risk: ${result.risk || 'unknown'}</strong>
+          ${result.score !== undefined ? `<div>Score: ${result.score}</div>` : ''}
+          ${result.flags?.length ? `<div>Flags: ${result.flags.join(', ')}</div>` : ''}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
 
+window.deleteJob = async function (id) {
+  if (!confirm('Delete this job permanently?')) return;
+
+  try {
+    await API.del(`/admin/jobs/${id}`);
+    Toast.show('Job deleted');
+    await loadJobs();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+  
   async function loadTestimonials() {
     const items = await API.get('/admin/testimonials');
     document.getElementById('adminMain').innerHTML = '<h1 class="section-title">Testimonials</h1>' + (items.length ? items.map(function (t) { var u = t.profiles || {}; return '<div class="card" style="margin-top:16px"><div class="card-body"><div style="display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><strong>' + (u.display_name || 'Member') + '</strong> <span class="badge badge-kyc">' + t.status + '</span><p style="color:var(--text-soft);margin-top:8px">' + t.message + '</p><div class="stars">' + stars(t.rating || 0) + '</div></div><div style="display:flex;gap:8px;align-items:start"><button class="btn btn-gold btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'approved\')">Approve</button><button class="btn btn-outline btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'hidden\')">Hide</button><button class="btn btn-outline btn-sm" onclick="moderateTestimonial(\'' + t.id + '\',\'rejected\')">Reject</button></div></div></div></div>'; }).join('') : '<p style="color:var(--text-muted);margin-top:24px">No testimonials.</p>');
@@ -687,54 +759,174 @@ window.deleteFeatured = async (id) => {
   }
 
   async function loadAds() {
-    const ads = await API.get('/admin/ads');
-    document.getElementById('adminMain').innerHTML = `
-      <h1 class="section-title">Content & Ads Management</h1>
-      <div class="card" style="margin:24px 0"><div class="card-body">
+  const ads = await API.get('/admin/ads');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Content & Ads Management</h1>
+
+    <div class="card" style="margin:24px 0">
+      <div class="card-body">
         <h3>Create Ad / Post</h3>
+
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="adTitle"></div>
-          <div class="form-group"><label class="form-label">Media URL</label><input class="form-input" id="adMedia">${adminImageUploadField('adMedia', 'adMediaFile', 'adMediaPreview', 'admin-ads')}</div>
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <input class="form-input" id="adTitle">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Media URL</label>
+            <input class="form-input" id="adMedia">
+            ${adminImageField('adMedia', 'adMediaFile', 'adMediaPreview')}
+          </div>
         </div>
-        <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="adDesc"></textarea></div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="adDesc"></textarea>
+        </div>
+
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Link URL (optional)</label><input class="form-input" id="adLink"></div>
-          <div class="form-group"><label class="form-label">Link behavior</label><select class="form-select" id="adTab"><option value="true">Open new tab</option><option value="false">Same tab</option></select></div>
+          <div class="form-group">
+            <label class="form-label">Link URL optional</label>
+            <input class="form-input" id="adLink">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Link Behavior</label>
+            <select class="form-select" id="adTab">
+              <option value="true">Open new tab</option>
+              <option value="false">Same tab</option>
+            </select>
+          </div>
         </div>
+
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Ad type</label><select class="form-select" id="adType"><option>banner</option><option>sidebar</option><option>popup</option><option>feed</option><option>hero</option></select></div>
-          <div class="form-group"><label class="form-label">Target page</label><select class="form-select" id="adPage"><option>all</option><option>landing</option><option>homepage</option><option>market</option><option>category</option><option>chat</option><option>payment</option><option>jobs</option></select></div>
+          <div class="form-group">
+            <label class="form-label">Ad Type</label>
+            <select class="form-select" id="adType">
+              <option value="banner">Banner</option>
+              <option value="sidebar">Sidebar</option>
+              <option value="popup">Popup</option>
+              <option value="feed">Feed</option>
+              <option value="hero">Hero</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target Page</label>
+            <select class="form-select" id="adPage">
+              <option value="all">All Pages</option>
+              <option value="landing">Landing</option>
+              <option value="homepage">Homepage</option>
+              <option value="market">Market</option>
+              <option value="category">Category</option>
+              <option value="chat">Chat</option>
+              <option value="payment">Payment</option>
+              <option value="jobs">Jobs</option>
+            </select>
+          </div>
         </div>
+
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Schedule (datetime)</label><input class="form-input" type="datetime-local" id="adSchedule"></div>
-          <div class="form-group"><label class="form-label">Expiry (datetime)</label><input class="form-input" type="datetime-local" id="adExpiry"></div>
+          <div class="form-group">
+            <label class="form-label">Schedule</label>
+            <input class="form-input" type="datetime-local" id="adSchedule">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Expiry</label>
+            <input class="form-input" type="datetime-local" id="adExpiry">
+          </div>
         </div>
+
         <button class="btn btn-gold" onclick="createAd()">Create Ad</button>
-      </div></div>
-      <h3>Existing Ads</h3>
-      ${ads.length ? ads.map(a => `<div class="card" style="margin-top:12px"><div class="card-body" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div><strong>${a.title}</strong> <span class="badge badge-kyc">${a.ad_type} • ${a.target_page}</span><br><span style="font-size:0.85rem;color:var(--text-muted)">${a.status} • ${timeAgo(a.created_at)}</span></div>
-        <button class="btn btn-outline btn-sm" onclick="deleteAd('${a.id}')">Delete</button>
-      </div></div>`).join('') : '<p style="color:var(--text-muted)">No ads yet.</p>'}`;
-    bindAdminImageUpload('adMedia', 'adMediaFile', 'adMediaPreview', 'admin-ads');
+      </div>
+    </div>
+
+    <h3>Existing Ads</h3>
+
+    ${ads.length ? ads.map(a => `
+      <div class="card" style="margin-top:12px">
+        <div class="card-body" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            ${a.media_url ? `
+              <img src="${a.media_url}" style="width:100px;height:70px;object-fit:cover;border-radius:8px">
+            ` : ''}
+
+            <div>
+              <strong>${a.title || 'Ad'}</strong>
+              <div class="card-meta">
+                ${a.ad_type || 'banner'} | ${a.target_page || 'all'} | ${a.status || 'active'}
+              </div>
+              <p style="color:var(--text-soft);font-size:0.9rem;margin-top:6px">${a.description || ''}</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="toggleAd('${a.id}', '${a.status === 'active' ? 'paused' : 'active'}')">
+              ${a.status === 'active' ? 'Pause' : 'Activate'}
+            </button>
+
+            <button class="btn btn-ghost btn-sm" onclick="deleteAd('${a.id}')">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('') : '<p style="color:var(--text-muted)">No ads yet.</p>'}
+  `;
+
+  bindAdminImage('adMedia', 'adMediaFile', 'adMediaPreview', 'admin-ads');
+}
+
+window.createAd = async function () {
+  try {
+    const title = document.getElementById('adTitle').value.trim();
+
+    if (!title) return Toast.show('Title is required');
+
+    await API.post('/admin/ads', {
+      title,
+      description: document.getElementById('adDesc').value,
+      media_url: document.getElementById('adMedia').value.trim() || null,
+      link_url: document.getElementById('adLink').value.trim() || null,
+      link_new_tab: document.getElementById('adTab').value === 'true',
+      ad_type: document.getElementById('adType').value,
+      target_page: document.getElementById('adPage').value,
+      schedule_at: document.getElementById('adSchedule').value || new Date().toISOString(),
+      expires_at: document.getElementById('adExpiry').value || null,
+      status: 'active'
+    });
+
+    Toast.show('Ad created');
+    await loadAds();
+  } catch (err) {
+    Toast.show(err.message);
   }
-  window.createAd = async () => {
-    try {
-      await API.post('/admin/ads', {
-        title: document.getElementById('adTitle').value,
-        description: document.getElementById('adDesc').value,
-        media_url: document.getElementById('adMedia').value,
-        link_url: document.getElementById('adLink').value,
-        link_new_tab: document.getElementById('adTab').value === 'true',
-        ad_type: document.getElementById('adType').value,
-        target_page: document.getElementById('adPage').value,
-        schedule_at: document.getElementById('adSchedule').value || new Date().toISOString(),
-        expires_at: document.getElementById('adExpiry').value || null
-      });
-      Toast.show('Ad created'); load('ads');
-    } catch (e) { Toast.show(e.message); }
-  };
-  window.deleteAd = async (id) => { await API.del(`/admin/ads/${id}`); Toast.show('Ad deleted'); load('ads'); };
+};
+
+window.toggleAd = async function (id, status) {
+  try {
+    await API.put(`/admin/ads/${id}`, { status });
+    Toast.show('Ad updated');
+    await loadAds();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.deleteAd = async function (id) {
+  if (!confirm('Delete this ad?')) return;
+
+  try {
+    await API.del(`/admin/ads/${id}`);
+    Toast.show('Ad deleted');
+    await loadAds();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
 
   async function loadExport() {
     document.getElementById('adminMain').innerHTML = `
@@ -984,6 +1176,62 @@ function getApprovalDelay(id) {
 function getAdminNote(prefix, id) {
   const el = document.getElementById(`${prefix}_${id}`);
   return el?.value || '';
+}
+
+  function adminImageField(inputId, fileId, previewId) {
+  return `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input type="file" id="${fileId}" accept="image/*" style="display:none">
+      <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('${fileId}').click()">Upload Image</button>
+    </div>
+    <div id="${previewId}" style="margin-top:10px"></div>
+  `;
+}
+
+function bindAdminImage(inputId, fileId, previewId, folder) {
+  const input = document.getElementById(inputId);
+  const file = document.getElementById(fileId);
+  const preview = document.getElementById(previewId);
+
+  if (!input || !file || !preview) return;
+
+  function render(url) {
+    if (!url) {
+      preview.innerHTML = '';
+      return;
+    }
+
+    preview.innerHTML = `
+      <img src="${url}" style="width:180px;height:110px;object-fit:cover;border:1px solid var(--border);border-radius:8px">
+    `;
+  }
+
+  input.addEventListener('input', () => render(input.value.trim()));
+  input.addEventListener('change', () => render(input.value.trim()));
+
+  if (input.value.trim()) render(input.value.trim());
+
+  file.addEventListener('change', async (e) => {
+    const selected = e.target.files && e.target.files[0];
+    if (!selected) return;
+
+    if (!selected.type.startsWith('image/')) {
+      Toast.show('Please select an image file');
+      return;
+    }
+
+    try {
+      Toast.show('Uploading image...');
+      const url = await uploadImage(selected, folder);
+      input.value = url;
+      render(url);
+      Toast.show('Image uploaded');
+    } catch (err) {
+      Toast.show('Upload failed: ' + err.message);
+    } finally {
+      file.value = '';
+    }
+  });
 }
 
 window.approveWithdrawal = async function (id) {
