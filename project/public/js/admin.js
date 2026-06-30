@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   { id: 'ads', label: 'Content & Ads' },
   { id: 'export', label: 'Google Sheets Export' },
   { id: 'fraud', label: 'Fraud Monitoring' },
+  { id: 'finance', label: 'Finance' },
   { id: 'settings', label: 'Settings' }
 ];
   const nav = document.getElementById('adminNav');
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (sec === 'ads') return await loadAds();
       if (sec === 'export') return await loadExport();
       if (sec === 'fraud') return await loadFraud();
+      if (sec === 'finance') return await loadFinanceApprovals();
       if (sec === 'settings') return await loadSettings();
     } catch (e) { main.innerHTML = `<p>Error: ${e.message}</p>`; }
   }
@@ -762,6 +764,341 @@ window.deleteFeatured = async (id) => {
     const r = await API.post('/ai/fraud-check', { type: document.getElementById('fraudType').value, data: {} });
     document.getElementById('fraudResult').innerHTML = `<span class="badge ${r.risk === 'high' ? 'badge-kyc' : r.risk === 'medium' ? 'badge-gold' : 'badge-verified'}">${r.risk} risk</span> ${r.flags?.join(', ') || ''}`;
   };
+
+  async function loadFinanceApprovals() {
+  const main = document.getElementById('adminMain');
+
+  main.innerHTML = `
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Finance Control</span>
+        <h1 class="section-title" style="font-size:2rem">Withdrawals & Refunds</h1>
+        <p class="section-sub">Approve, hold, cancel, or reject money-out requests after review.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="align-items:start">
+      <div>
+        <h2 style="font-size:1.4rem;margin-bottom:14px">Withdrawal Requests</h2>
+        <div id="adminWithdrawals">
+          <div class="skeleton" style="height:120px"></div>
+        </div>
+      </div>
+
+      <div>
+        <h2 style="font-size:1.4rem;margin-bottom:14px">Refund Requests</h2>
+        <div id="adminRefunds">
+          <div class="skeleton" style="height:120px"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const [withdrawals, refunds] = await Promise.all([
+    API.get('/admin/withdrawals').catch(() => []),
+    API.get('/admin/refunds').catch(() => [])
+  ]);
+
+  document.getElementById('adminWithdrawals').innerHTML = withdrawals.length
+    ? withdrawals.map(withdrawalCard).join('')
+    : '<p style="color:var(--text-muted)">No withdrawal requests yet.</p>';
+
+  document.getElementById('adminRefunds').innerHTML = refunds.length
+    ? refunds.map(refundCard).join('')
+    : '<p style="color:var(--text-muted)">No refund requests yet.</p>';
+}
+
+function approvalDelaySelect(id) {
+  return `
+    <label class="form-label" style="font-size:0.8rem;margin-bottom:4px">Delay</label>
+    <select class="form-select" id="approvalDelayMinutes_${id}" style="max-width:180px">
+      <option value="5">5 minutes</option>
+      <option value="10">10 minutes</option>
+      <option value="30">30 minutes</option>
+      <option value="60">1 hour</option>
+      <option value="1440">24 hours</option>
+      <option value="10080">7 days</option>
+    </select>
+  `;
+}
+
+function withdrawalCard(w) {
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>${fmtPrice(w.amount)}</strong>
+            <div class="card-meta">
+              <span>${w.bank_name || 'No bank'}</span>
+              <span>|</span>
+              <span>${w.account_number || 'No account'}</span>
+              <span>|</span>
+              <span>${w.account_holder_name || 'No account name'}</span>
+            </div>
+          </div>
+
+          <div style="text-align:right">
+            <span class="badge badge-kyc">${w.status || 'pending'}</span>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
+              ${w.execution_status || 'not_scheduled'}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;color:var(--text-muted);font-size:0.85rem">
+          Risk: ${w.ai_risk?.risk || 'unknown'}
+          ${w.ai_risk?.score !== undefined ? ` | Score: ${w.ai_risk.score}` : ''}
+        </div>
+
+        ${w.scheduled_for ? `
+          <div style="margin-top:6px;color:var(--text-muted);font-size:0.85rem">
+            Scheduled for: ${new Date(w.scheduled_for).toLocaleString()}
+          </div>
+        ` : ''}
+
+        ${w.admin_note ? `
+          <div style="margin-top:8px;color:var(--text-soft);font-size:0.85rem">
+            Admin note: ${w.admin_note}
+          </div>
+        ` : ''}
+
+        <textarea
+          class="form-textarea"
+          id="withdrawalNote_${w.id}"
+          placeholder="Admin note"
+          style="margin-top:10px"
+        ></textarea>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:end">
+          <div>${approvalDelaySelect(w.id)}</div>
+
+          <button class="btn btn-gold btn-sm" onclick="approveWithdrawal('${w.id}')">
+            Approve
+          </button>
+
+          <button class="btn btn-outline btn-sm" onclick="holdWithdrawal('${w.id}')">
+            Hold
+          </button>
+
+          <button class="btn btn-ghost btn-sm" onclick="cancelWithdrawal('${w.id}')">
+            Cancel
+          </button>
+
+          <button class="btn btn-outline btn-sm" onclick="rejectWithdrawal('${w.id}')">
+            Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function refundCard(r) {
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>Refund Request</strong>
+            <div class="card-meta">
+              <span>Reason: ${r.reason || 'Not stated'}</span>
+              <span>|</span>
+              <span>Escrow: ${r.escrow_id || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div style="text-align:right">
+            <span class="badge badge-kyc">${r.status || 'pending'}</span>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">
+              ${r.execution_status || 'not_scheduled'}
+            </div>
+          </div>
+        </div>
+
+        ${r.notes ? `
+          <p style="color:var(--text-soft);margin-top:8px;font-size:0.9rem">${r.notes}</p>
+        ` : ''}
+
+        <div style="margin-top:10px;color:var(--text-muted);font-size:0.85rem">
+          Risk: ${r.ai_risk?.risk || 'unknown'}
+          ${r.ai_risk?.score !== undefined ? ` | Score: ${r.ai_risk.score}` : ''}
+        </div>
+
+        ${r.evidence_urls && r.evidence_urls.length ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            ${r.evidence_urls.map(url => `
+              <a href="${url}" target="_blank" class="btn btn-outline btn-sm">Evidence</a>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        ${r.scheduled_for ? `
+          <div style="margin-top:6px;color:var(--text-muted);font-size:0.85rem">
+            Scheduled for: ${new Date(r.scheduled_for).toLocaleString()}
+          </div>
+        ` : ''}
+
+        ${r.admin_note ? `
+          <div style="margin-top:8px;color:var(--text-soft);font-size:0.85rem">
+            Admin note: ${r.admin_note}
+          </div>
+        ` : ''}
+
+        <textarea
+          class="form-textarea"
+          id="refundNote_${r.id}"
+          placeholder="Admin note"
+          style="margin-top:10px"
+        ></textarea>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:end">
+          <div>${approvalDelaySelect(r.id)}</div>
+
+          <button class="btn btn-gold btn-sm" onclick="approveRefund('${r.id}')">
+            Approve
+          </button>
+
+          <button class="btn btn-outline btn-sm" onclick="holdRefund('${r.id}')">
+            Hold
+          </button>
+
+          <button class="btn btn-ghost btn-sm" onclick="cancelRefund('${r.id}')">
+            Cancel
+          </button>
+
+          <button class="btn btn-outline btn-sm" onclick="rejectRefund('${r.id}')">
+            Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getApprovalDelay(id) {
+  const el = document.getElementById(`approvalDelayMinutes_${id}`);
+  return Number(el?.value || 5);
+}
+
+function getAdminNote(prefix, id) {
+  const el = document.getElementById(`${prefix}_${id}`);
+  return el?.value || '';
+}
+
+window.approveWithdrawal = async function (id) {
+  try {
+    await API.put(`/admin/withdrawals/${id}`, {
+      status: 'approved',
+      admin_note: getAdminNote('withdrawalNote', id),
+      approval_delay_minutes: getApprovalDelay(id)
+    });
+
+    Toast.show('Withdrawal approved and scheduled');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.holdWithdrawal = async function (id) {
+  try {
+    await API.put(`/admin/withdrawals/${id}`, {
+      status: 'held',
+      admin_note: getAdminNote('withdrawalNote', id)
+    });
+
+    Toast.show('Withdrawal placed on hold');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.cancelWithdrawal = async function (id) {
+  try {
+    await API.put(`/admin/withdrawals/${id}`, {
+      status: 'cancelled',
+      admin_note: getAdminNote('withdrawalNote', id)
+    });
+
+    Toast.show('Withdrawal cancelled');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.rejectWithdrawal = async function (id) {
+  try {
+    await API.put(`/admin/withdrawals/${id}`, {
+      status: 'rejected',
+      admin_note: getAdminNote('withdrawalNote', id)
+    });
+
+    Toast.show('Withdrawal rejected');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.approveRefund = async function (id) {
+  try {
+    await API.put(`/admin/refunds/${id}`, {
+      status: 'approved',
+      admin_note: getAdminNote('refundNote', id),
+      approval_delay_minutes: getApprovalDelay(id)
+    });
+
+    Toast.show('Refund approved and scheduled');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.holdRefund = async function (id) {
+  try {
+    await API.put(`/admin/refunds/${id}`, {
+      status: 'held',
+      admin_note: getAdminNote('refundNote', id)
+    });
+
+    Toast.show('Refund placed on hold');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.cancelRefund = async function (id) {
+  try {
+    await API.put(`/admin/refunds/${id}`, {
+      status: 'cancelled',
+      admin_note: getAdminNote('refundNote', id)
+    });
+
+    Toast.show('Refund cancelled');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+window.rejectRefund = async function (id) {
+  try {
+    await API.put(`/admin/refunds/${id}`, {
+      status: 'rejected',
+      admin_note: getAdminNote('refundNote', id)
+    });
+
+    Toast.show('Refund rejected');
+    await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
 
   async function loadSettings() {
     const s = await API.get('/admin/settings');
