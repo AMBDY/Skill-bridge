@@ -167,20 +167,20 @@ function renderFreelancer(main, user, summary) {
     ${dashboardHeader(user, 'Freelancer Dashboard')}
 
     <div class="grid grid-4" style="margin:24px 0">
-      ${statCard('New Jobs', summary.availableJobs.length, '/jobs.html')}
-      ${statCard('Jobs Applied', summary.bids.length)}
+      ${statCard('New Jobs', summary.availableJobs.length, '#availableJobsSection')}
+      ${statCard('Jobs Applied', summary.bids.length, '#applicationsSection')}
       ${statCard('Unread Messages', summary.notifications.filter(n => !n.read).length, '/chat.html')}
-      ${statCard('Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
+      ${statCard('Edit Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
     </div>
 
     <div class="grid grid-2">
-      <div>
+      <div id="availableJobsSection">
         <h2 style="font-size:1.4rem;margin:0 0 14px">Recommended Jobs</h2>
         ${rows(summary.availableJobs, 'No new jobs available.', jobRow)}
       </div>
 
-      <div>
-        <h2 style="font-size:1.4rem;margin:0 0 14px">My Applications</h2>
+      <div id="applicationsSection">
+        <h2 style="font-size:1.4rem;margin:0 0 14px">Jobs Applied</h2>
         ${rows(summary.bids, 'No applications yet.', bidRow)}
 
         <h2 style="font-size:1.4rem;margin:24px 0 14px">Withdrawals</h2>
@@ -189,27 +189,33 @@ function renderFreelancer(main, user, summary) {
     </div>
   `;
 }
-
 function renderWorker(main, user, summary) {
   main.innerHTML = `
     ${dashboardHeader(user, 'Worker Dashboard')}
 
     <div class="grid grid-4" style="margin:24px 0">
-      ${statCard('Available Jobs', summary.availableJobs.length, '/jobs.html')}
-      ${statCard('Jobs Applied', summary.bids.length)}
-      ${statCard('My Services', summary.services.length)}
-      ${statCard('KYC Status', `L${user?.kyc_level || 0}`)}
+      ${statCard('Available Jobs', summary.availableJobs.length, '#availableJobsSection')}
+      ${statCard('Jobs Applied', summary.bids.length, '#applicationsSection')}
+      ${statCard('My Services', summary.services.length, '#servicesSection')}
+      ${statCard('Edit Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
     </div>
 
     <div class="grid grid-2">
-      <div>
+      <div id="availableJobsSection">
         <h2 style="font-size:1.4rem;margin:0 0 14px">Available Jobs</h2>
         ${rows(summary.availableJobs, 'No jobs available.', jobRow)}
       </div>
 
       <div>
-        <h2 style="font-size:1.4rem;margin:0 0 14px">My Service Listings</h2>
-        ${rows(summary.services, 'No services listed yet.', serviceRow)}
+        <div id="applicationsSection">
+          <h2 style="font-size:1.4rem;margin:0 0 14px">Jobs Applied</h2>
+          ${rows(summary.bids, 'No applications yet.', bidRow)}
+        </div>
+
+        <div id="servicesSection">
+          <h2 style="font-size:1.4rem;margin:24px 0 14px">My Services</h2>
+          ${rows(summary.services, 'No services listed yet.', serviceRow)}
+        </div>
 
         <h2 style="font-size:1.4rem;margin:24px 0 14px">Withdrawals</h2>
         ${withdrawalRows(summary.withdrawals)}
@@ -217,7 +223,6 @@ function renderWorker(main, user, summary) {
     </div>
   `;
 }
-
 function renderSeller(main, user, summary) {
   main.innerHTML = `
     ${dashboardHeader(user, 'Seller Dashboard')}
