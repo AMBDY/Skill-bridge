@@ -1,10 +1,53 @@
 const router = require('express').Router();
 
-// AI Smart Search ranking placeholder
-// Ranks workers by: subscription tier, rating, completion rate, reviews, response speed, location
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+async function callOpenAI(messages, fallback) {
+  if (!OPENAI_API_KEY) return fallback;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages,
+      temperature: 0.2
+    })
+  });
+
+  if (!response.ok) return fallback;
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || fallback;
+}
+
+function deterministicRiskScore(payload) {
+  let score = 0;
+  const amount = Number(payload.amount || payload.data?.amount || 0);
+
+  if (amount >= 1000000) score += 35;
+  else if (amount >= 500000) score += 20;
+  else if (amount >= 100000) score += 10;
+
+  const reason = String(payload.reason || payload.data?.reason || '').toLowerCase();
+  if (reason.includes('scam')) score += 20;
+  if (reason.includes('fake')) score += 15;
+  if (reason.includes('urgent')) score += 10;
+
+  if (payload.user_kyc_level !== undefined && Number(payload.user_kyc_level) < 2) score += 20;
+
+  const risk = score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
+  return { risk, score, flags: [] };
+}
+
 router.post('/search/rank', (req, res) => {
   const { candidates, location } = req.body;
   const tierWeight = { elite: 4, featured: 3, pro: 2, free: 1 };
+
   const ranked = (candidates || []).map(c => {
     const tierScore = tierWeight[c.subscription_tier] || 1;
     const ratingScore = (c.rating || 0) / 5;
@@ -15,45 +58,88 @@ router.post('/search/rank', (req, res) => {
     const score = (tierScore * 0.3) + (ratingScore * 0.25) + (completionScore * 0.15) + (reviewScore * 0.1) + (responseScore * 0.1) + (locationScore * 0.1);
     return { ...c, ai_score: +score.toFixed(3) };
   }).sort((a, b) => b.ai_score - a.ai_score);
-  res.json({ ranked, note: 'AI ranking placeholder - wire to ML model in production' });
+
+  res.json({ ranked });
 });
 
-// AI Recommendation placeholder
-router.post('/recommend', (req, res) => {
-  const { query, candidates } = req.body;
-  res.json({ recommendation: candidates?.[0] || null, note: 'AI recommendation placeholder' });
+router.post('/fraud-check', async (req, res) => {
+  const fallback = deterministicRiskScore(req.body);
+
+  const aiText = await callOpenAI([
+    {
+      role: 'system',
+      content: 'You are a strict fraud risk analyst for an escrow marketplace. Return compact JSON only with risk, score, and flags.'
+    },
+    {
+      role: 'user',
+      content: JSON.stringify(req.body)
+    }
+  ], JSON.stringify(fallback));
+
+  try {
+    res.json(JSON.parse(aiText));
+  } catch {
+    res.json(fallback);
+  }
 });
 
-// AI Translation placeholder
-router.post('/translate', (req, res) => {
-  const { text, target_lang } = req.body;
-  res.json({
-    original: text,
-    translated: `[${target_lang}] ${text}`,
-    detected_lang: 'auto',
-    note: 'AI translation placeholder - wire to translation API (Google Translate / DeepL) in production. Supported: en, fr, es, pt, ar, zh, hi, ja, ko, de, it, ru, tr, yo, ha, ig'
-  });
+router.post('/profile-suggestions', async (req, res) => {
+  const { profile } = req.body;
+
+  const fallback = {
+    suggestions: [
+      !profile?.headline ? 'Add a clear professional headline.' : null,
+      !profile?.about ? 'Add an about section that explains your experience.' : null,
+      !profile?.skills?.length ? 'Add at least 5 skills.' : null,
+      !profile?.profile_image ? 'Upload a profile picture.' : null
+    ].filter(Boolean)
+  };
+
+  const aiText = await callOpenAI([
+    { role: 'system', content: 'Return compact JSON only: {"suggestions":["..."]}' },
+    { role: 'user', content: JSON.stringify(profile || {}) }
+  ], JSON.stringify(fallback));
+
+  try {
+    res.json(JSON.parse(aiText));
+  } catch {
+    res.json(fallback);
+  }
 });
 
-// AI Fraud detection placeholder
-router.post('/fraud-check', (req, res) => {
-  const { type, data } = req.body;
-  const risk = Math.random() > 0.9 ? 'high' : Math.random() > 0.7 ? 'medium' : 'low';
-  res.json({ type, risk, flags: risk === 'high' ? ['suspicious_pattern'] : [], note: 'AI fraud detection placeholder' });
-});
-
-// AI Price suggestion placeholder
-router.post('/price-suggest', (req, res) => {
+router.post('/price-suggest', async (req, res) => {
   const { category, description } = req.body;
-  const base = { hire: 25000, shop: 15000, jobs: 50000 };
-  const suggested = base[category] || 20000;
-  res.json({ suggestedPrice: suggested, range: { min: suggested * 0.7, max: suggested * 1.3 }, note: 'AI price suggestion placeholder' });
+  const fallbackAmount = category === 'jobs' ? 50000 : category === 'shop' ? 15000 : 25000;
+
+  const fallback = {
+    suggestedPrice: fallbackAmount,
+    range: {
+      min: fallbackAmount * 0.7,
+      max: fallbackAmount * 1.3
+    }
+  };
+
+  const aiText = await callOpenAI([
+    { role: 'system', content: 'Return compact JSON only with suggestedPrice and range {min,max}. Currency is NGN.' },
+    { role: 'user', content: JSON.stringify({ category, description }) }
+  ], JSON.stringify(fallback));
+
+  try {
+    res.json(JSON.parse(aiText));
+  } catch {
+    res.json(fallback);
+  }
 });
 
-// AI Writing assistant placeholder
-router.post('/improve-message', (req, res) => {
+router.post('/improve-message', async (req, res) => {
   const { text } = req.body;
-  res.json({ improved: text, note: 'AI writing assistant placeholder - wire to LLM API in production' });
+
+  const improved = await callOpenAI([
+    { role: 'system', content: 'Improve this marketplace message. Keep it concise and professional.' },
+    { role: 'user', content: text || '' }
+  ], text || '');
+
+  res.json({ improved });
 });
 
 module.exports = router;
