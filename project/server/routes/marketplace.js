@@ -318,8 +318,8 @@ router.get('/cms/slides', async (req, res) => {
     .from('homepage_slides')
     .select('*')
     .eq('status', 'active')
-    .order('sort_order', { ascending: true })
-    .limit(20);
+    .order('sort_order')
+    .order('created_at', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
   res.json(data || []);
@@ -327,34 +327,53 @@ router.get('/cms/slides', async (req, res) => {
 
 router.get('/cms/content', async (req, res) => {
   const { target_page } = req.query;
-
-  let q = supabase
-    .from('site_content')
-    .select('*')
-    .eq('status', 'active');
-
+  let q = supabase.from('site_content').select('*').eq('status', 'active');
   if (target_page) q = q.eq('target_page', target_page);
-
-  const { data, error } = await q.order('updated_at', { ascending: false });
-
+  const { data, error } = await q.order('created_at', { ascending: false });
   if (error) return res.status(400).json({ error: error.message });
   res.json(data || []);
 });
 
 router.get('/cms/featured', async (req, res) => {
   const { placement } = req.query;
-
-  let q = supabase
-    .from('featured_items')
-    .select('*')
-    .eq('status', 'active');
-
+  let q = supabase.from('featured_items').select('*').eq('status', 'active');
   if (placement) q = q.eq('placement', placement);
-
-  const { data, error } = await q.order('sort_order', { ascending: true });
-
+  const { data, error } = await q.order('sort_order').order('created_at', { ascending: false });
   if (error) return res.status(400).json({ error: error.message });
   res.json(data || []);
+});
+
+router.post('/testimonials', authMiddleware, async (req, res) => {
+  const c = authedClient(req);
+  const { name, role, text, image_url } = req.body;
+
+  const { data, error } = await c.from('testimonials').insert({
+    user_id: req.user.id,
+    name,
+    role,
+    text,
+    image_url: image_url || null,
+    status: 'pending'
+  }).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.post('/comments', authMiddleware, async (req, res) => {
+  const c = authedClient(req);
+  const { target_type, target_id, body } = req.body;
+
+  const { data, error } = await c.from('comments').insert({
+    user_id: req.user.id,
+    target_type,
+    target_id,
+    body,
+    status: 'pending'
+  }).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 module.exports = router;
