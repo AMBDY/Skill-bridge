@@ -430,12 +430,13 @@ async function loadNotifications() {
   }
 }
 
-document.querySelectorAll('.mobile-nav-link').forEach(link => {
-  link.addEventListener('click', () => {
-    document.body.classList.remove('mobile-nav-open');
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.mobile-nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      document.body.classList.remove('mobile-nav-open');
+    });
   });
 });
-}
 
 function renderFooter() {
   const f = document.getElementById('footer');
