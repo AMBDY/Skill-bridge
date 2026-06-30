@@ -229,6 +229,68 @@ function renderSeller(main, user, summary) {
       ${statCard('Store Profile', 'Edit', `/profile.html?id=${user?.user_id}`)}
     </div>
 
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">
+  <button class="btn btn-gold" onclick="openProductForm()">+ Upload Product</button>
+  <a href="/profile.html?id=${user?.user_id}&edit=1" class="btn btn-outline">Edit Store Profile</a>
+</div>
+
+<div id="sellerProductForm" style="display:none;margin-bottom:24px">
+  <div class="card">
+    <div class="card-body">
+      <h2 style="font-size:1.3rem;margin-bottom:14px">Upload Product</h2>
+
+      <form id="productUploadForm">
+        <div class="form-group">
+          <label class="form-label">Product Category</label>
+          <select class="form-select" name="category_id" id="sellerProductCategory" required></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Product Title</label>
+          <input class="form-input" name="title" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" name="description" required></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Price</label>
+            <input class="form-input" type="number" name="price" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Stock</label>
+            <input class="form-input" type="number" name="stock" value="1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Size</label>
+            <input class="form-input" name="size">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <input class="form-input" name="color">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Product Images</label>
+          <input type="file" id="productImageInput" accept="image/*" multiple>
+          <div id="productImagePreview" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div>
+        </div>
+
+        <button class="btn btn-gold btn-block" type="submit">Submit Product For Approval</button>
+      </form>
+    </div>
+  </div>
+</div>
+
     <div class="grid grid-2">
       <div>
         <h2 style="font-size:1.4rem;margin:0 0 14px">My Products</h2>
@@ -262,3 +324,93 @@ function renderAdmin(main, user, summary) {
     </div>
   `;
 }
+
+let sellerProductImages = [];
+
+window.openProductForm = async function () {
+  const formWrap = document.getElementById('sellerProductForm');
+  formWrap.style.display = formWrap.style.display === 'none' ? 'block' : 'none';
+
+  const catSel = document.getElementById('sellerProductCategory');
+  if (catSel && !catSel.dataset.loaded) {
+    const cats = await API.get('/marketplace/categories?ecosystem=shop').catch(() => []);
+    catSel.innerHTML =
+      '<option value="">Select product category</option>' +
+      cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    catSel.dataset.loaded = '1';
+  }
+
+  bindProductUploadForm();
+};
+
+function bindProductUploadForm() {
+  const fileInput = document.getElementById('productImageInput');
+  const preview = document.getElementById('productImagePreview');
+  const form = document.getElementById('productUploadForm');
+
+  if (!fileInput || fileInput.dataset.bound) return;
+  fileInput.dataset.bound = '1';
+
+  fileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        Toast.show('Only image files are allowed');
+        continue;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        Toast.show('Each image must be under 5MB');
+        continue;
+      }
+
+      const url = await uploadImage(file, 'seller-products');
+      sellerProductImages.push(url);
+    }
+
+    preview.innerHTML = sellerProductImages.map((url, index) => `
+      <div style="width:110px;position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <img src="${url}" style="width:110px;height:90px;object-fit:cover">
+        <button type="button" onclick="removeSellerProductImage(${index})"
+          style="position:absolute;top:4px;right:4px;background:#111;color:#fff;border:0;border-radius:999px;width:24px;height:24px;cursor:pointer">×</button>
+      </div>
+    `).join('');
+
+    e.target.value = '';
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const data = Object.fromEntries(new FormData(e.target));
+
+    data.price = data.price ? Number(data.price) : 0;
+    data.stock = data.stock ? Number(data.stock) : 1;
+    data.images = sellerProductImages;
+
+    if (!data.size) delete data.size;
+    if (!data.color) delete data.color;
+
+    try {
+      await API.post('/marketplace/products', data);
+      Toast.show('Product submitted for approval');
+      setTimeout(() => location.reload(), 1000);
+    } catch (err) {
+      Toast.show(err.message);
+    }
+  });
+}
+
+window.removeSellerProductImage = function (index) {
+  sellerProductImages.splice(index, 1);
+  const preview = document.getElementById('productImagePreview');
+
+  preview.innerHTML = sellerProductImages.map((url, i) => `
+    <div style="width:110px;position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <img src="${url}" style="width:110px;height:90px;object-fit:cover">
+      <button type="button" onclick="removeSellerProductImage(${i})"
+        style="position:absolute;top:4px;right:4px;background:#111;color:#fff;border:0;border-radius:999px;width:24px;height:24px;cursor:pointer">×</button>
+    </div>
+  `).join('');
+};
