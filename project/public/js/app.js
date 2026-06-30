@@ -302,16 +302,27 @@ function timeAgo(date) {
 
 function renderNav() {
   const nav = document.getElementById('navbar');
+
   if (!nav) return;
+
   const logged = Auth.isLoggedIn();
   const user = Auth.user();
+
   nav.innerHTML = `
     <div class="container nav-inner">
       <a href="/" class="logo">Skill<span>Bridge</span></a>
-      <div class="nav-search"><input type="text" placeholder="Search services, products, jobs..." id="navSearchInput"></div>
+
+      <div class="nav-search">
+        <input type="text" placeholder="Search services, products, jobs..." id="navSearchInput">
+      </div>
+
       <div class="nav-actions">
         <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
-        <button class="icon-btn" id="notifBtn" title="Notifications">🔔${logged ? '<span class="badge">0</span>' : ''}</button>
+
+        <button class="icon-btn" id="notifBtn" title="Notifications">
+          🔔${logged ? '<span class="badge">0</span>' : ''}
+        </button>
+
         ${logged ? `
           <a href="/chat.html" class="icon-btn" title="Messages">💬</a>
           <a href="/dashboard.html" class="btn btn-outline btn-sm">Dashboard</a>
@@ -321,28 +332,102 @@ function renderNav() {
           <a href="/signin.html" class="btn btn-ghost btn-sm">Sign in</a>
           <a href="/signup.html" class="btn btn-gold btn-sm">Sign up</a>
         `}
+
         <button class="icon-btn hamburger" id="hamburger">☰</button>
       </div>
-      <div class="mobile-nav-panel">
-  <a class="mobile-nav-link" href="/hire.html">Hire Talent</a>
-  <a class="mobile-nav-link" href="/shop.html">Shop Products</a>
-  <a class="mobile-nav-link" href="/jobs.html">Find Jobs</a>
-  <a class="mobile-nav-link" href="/post-job.html">Post Job</a>
-  <a class="mobile-nav-link" href="/profile.html">Profile</a>
-  <a class="mobile-nav-link" href="/dashboard.html">Dashboard</a>
-</div>
-    </div>`;
+    </div>
+  `;
+
   Theme.updateToggle();
-  document.getElementById('themeToggle').addEventListener('click', Theme.toggle);
-  const si = document.getElementById('navSearchInput');
-  if (si) si.addEventListener('keydown', (e) => { if (e.key === 'Enter') window.location.href = `/search.html?q=${encodeURIComponent(si.value)}`; });
-  const lo = document.getElementById('logoutBtn');
-  if (lo) lo.addEventListener('click', () => { Auth.logout(); Toast.show('Signed out'); });
+
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', Theme.toggle);
+  }
+
+  const searchInput = document.getElementById('navSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        window.location.href = `/search.html?q=${encodeURIComponent(searchInput.value)}`;
+      }
+    });
+  }
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      Auth.logout();
+      Toast.show('Signed out');
+    });
+  }
+
   const hamburger = document.getElementById('hamburger');
-if (hamburger) {
-  hamburger.addEventListener('click', () => {
-    document.body.classList.toggle('mobile-nav-open');
-  });
+  if (hamburger) {
+    hamburger.addEventListener('click', () => {
+      document.body.classList.toggle('nav-open');
+    });
+  }
+
+  if (logged) {
+    loadNotifications();
+  }
+}
+
+async function loadNotifications() {
+  try {
+    const notifications = await API.get('/marketplace/notifications');
+    const unread = notifications.filter(n => !n.read).length;
+
+    const notifBtn = document.getElementById('notifBtn');
+
+    if (!notifBtn) return;
+
+    notifBtn.innerHTML = `🔔${unread ? `<span class="badge">${unread}</span>` : ''}`;
+
+    notifBtn.addEventListener('click', () => {
+      const existing = document.getElementById('notifPanel');
+
+      if (existing) {
+        existing.remove();
+        return;
+      }
+
+      const panel = document.createElement('div');
+
+      panel.id = 'notifPanel';
+      panel.style.cssText = `
+        position:fixed;
+        top:72px;
+        right:20px;
+        width:min(360px, calc(100vw - 40px));
+        max-height:420px;
+        overflow:auto;
+        background:var(--bg-elev);
+        border:1px solid var(--border);
+        border-radius:12px;
+        box-shadow:var(--shadow);
+        z-index:9999;
+        padding:12px;
+      `;
+
+      panel.innerHTML = notifications.length
+        ? notifications.map(n => `
+          <a href="${n.link || '#'}" style="display:block;padding:10px;border-bottom:1px solid var(--border)">
+            <strong>${n.title || 'Notification'}</strong>
+            <div style="color:var(--text-soft);font-size:0.88rem">${n.body || ''}</div>
+            <div style="color:var(--text-muted);font-size:0.78rem">
+              ${n.created_at ? timeAgo(n.created_at) : ''}
+            </div>
+          </a>
+        `).join('')
+        : '<p style="color:var(--text-muted);padding:12px">No notifications yet.</p>';
+
+      document.body.appendChild(panel);
+    });
+  } catch (err) {
+    console.warn('Notification load failed:', err.message);
+  }
 }
 
 document.querySelectorAll('.mobile-nav-link').forEach(link => {
