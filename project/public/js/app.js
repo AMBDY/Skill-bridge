@@ -197,7 +197,21 @@ const Auth = (function () {
     window.location.href = '/';
   }
 
-  return { getToken, setSession, clear, user, isLoggedIn, me, signin, signup, logout };
+  async function resetPassword(email) {
+  const client = await initSb();
+  if (!client) throw new Error('Supabase not initialized');
+
+  const redirectTo = `${window.location.origin}/signin.html`;
+
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo
+  });
+
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+ return { getToken, setSession, clear, user, isLoggedIn, me, signin, signup, logout, resetPassword };
 })();
 
 // Upload image to Supabase Storage
