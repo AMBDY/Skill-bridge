@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   { id: 'users', label: 'Users' },
   { id: 'kyc', label: 'KYC Review' },
   { id: 'jobs', label: 'Job Moderation' },
+  { id: 'recruitmentJobs', label: 'Recruitment Jobs' },
   { id: 'socialModeration', label: 'Testimonials & Comments' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'disputes', label: 'Disputes' },
@@ -51,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (sec === 'users') return await loadUsers();
       if (sec === 'kyc') return await loadKyc();
       if (sec === 'jobs') return await loadJobs();
+      if (sec === 'recruitmentJobs') return await loadRecruitmentJobsAdmin();
       if (sec === 'reviews') return await loadReviews();
       if (sec === 'disputes') return await loadDisputes();
       if (sec === 'payments') return await loadPayments();
@@ -1387,6 +1389,46 @@ window.rejectRefund = async function (id) {
 
     Toast.show('Refund rejected');
     await loadFinanceApprovals();
+  } catch (err) {
+    Toast.show(err.message);
+  }
+};
+
+  async function loadRecruitmentJobsAdmin() {
+  const jobs = await API.get('/recruitment/admin/jobs');
+
+  document.getElementById('adminMain').innerHTML = `
+    <h1 class="section-title">Recruitment Job Approval</h1>
+
+    ${jobs.length ? jobs.map(j => `
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-body">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <strong>${j.title}</strong>
+              <div class="card-meta">${j.company_name} | ${j.location || 'No location'} | ${j.approval_status}</div>
+            </div>
+            <span class="badge badge-kyc">${j.ai_plan}</span>
+          </div>
+
+          <p style="color:var(--text-soft);margin-top:10px">${j.description || ''}</p>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            ${j.approval_status !== 'approved' ? `<button class="btn btn-gold btn-sm" onclick="setRecruitmentJobStatus('${j.id}','approved')">Approve</button>` : ''}
+            ${j.approval_status !== 'rejected' ? `<button class="btn btn-outline btn-sm" onclick="setRecruitmentJobStatus('${j.id}','rejected')">Reject</button>` : ''}
+            ${j.approval_status !== 'suspended' ? `<button class="btn btn-outline btn-sm" onclick="setRecruitmentJobStatus('${j.id}','suspended')">Suspend</button>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('') : '<p style="color:var(--text-muted)">No recruitment jobs yet.</p>'}
+  `;
+}
+
+window.setRecruitmentJobStatus = async function (id, approval_status) {
+  try {
+    await API.put(`/recruitment/admin/jobs/${id}/status`, { approval_status });
+    Toast.show('Recruitment job ' + approval_status);
+    await loadRecruitmentJobsAdmin();
   } catch (err) {
     Toast.show(err.message);
   }
