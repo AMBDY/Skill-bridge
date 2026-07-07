@@ -302,11 +302,15 @@ function timeAgo(date) {
 
 function renderNav() {
   const nav = document.getElementById('navbar');
-
   if (!nav) return;
 
   const logged = Auth.isLoggedIn();
   const user = Auth.user();
+
+  const recruitmentHref =
+    logged && ['client', 'admin'].includes(user?.role)
+      ? '/recruiter-jobs.html'
+      : '/recruitment-jobs.html';
 
   nav.innerHTML = `
     <div class="container nav-inner">
@@ -317,15 +321,16 @@ function renderNav() {
       </div>
 
       <div class="nav-actions">
-        <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">Theme</button>
 
         <button class="icon-btn" id="notifBtn" title="Notifications">
-          🔔${logged ? '<span class="badge">0</span>' : ''}
+          Notifications${logged ? '<span class="badge">0</span>' : ''}
         </button>
 
+        <a href="${recruitmentHref}" class="btn btn-outline btn-sm">Job Recruitment</a>
+
         ${logged ? `
-          <a href="/chat.html" class="icon-btn" title="Messages">💬</a>
-          <a href="/recruitment-jobs.html" class="btn btn-outline btn-sm">Job Recruitment</a>
+          <a href="/chat.html" class="btn btn-outline btn-sm">Messages</a>
           <a href="/dashboard.html" class="btn btn-outline btn-sm">Dashboard</a>
           ${user && user.role === 'admin' ? '<a href="/admin.html" class="btn btn-gold btn-sm">Admin</a>' : ''}
           <button class="btn btn-primary btn-sm" id="logoutBtn">Sign out</button>
@@ -334,7 +339,7 @@ function renderNav() {
           <a href="/signup.html" class="btn btn-gold btn-sm">Sign up</a>
         `}
 
-        <button class="icon-btn hamburger" id="hamburger">☰</button>
+        <button class="icon-btn hamburger" id="hamburger">Menu</button>
       </div>
     </div>
   `;
@@ -342,9 +347,7 @@ function renderNav() {
   Theme.updateToggle();
 
   const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', Theme.toggle);
-  }
+  if (themeToggle) themeToggle.addEventListener('click', Theme.toggle);
 
   const searchInput = document.getElementById('navSearchInput');
   if (searchInput) {
@@ -370,7 +373,83 @@ function renderNav() {
     });
   }
 
-  if (logged) {
+  if (logged && typeof loadNotifications === 'function') {
+    loadNotifications();
+  }
+}function renderNav() {
+  const nav = document.getElementById('navbar');
+  if (!nav) return;
+
+  const logged = Auth.isLoggedIn();
+  const user = Auth.user();
+
+  const recruitmentHref =
+    logged && ['client', 'admin'].includes(user?.role)
+      ? '/recruiter-jobs.html'
+      : '/recruitment-jobs.html';
+
+  nav.innerHTML = `
+    <div class="container nav-inner">
+      <a href="/" class="logo">Skill<span>Bridge</span></a>
+
+      <div class="nav-search">
+        <input type="text" placeholder="Search services, products, jobs..." id="navSearchInput">
+      </div>
+
+      <div class="nav-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">Theme</button>
+
+        <button class="icon-btn" id="notifBtn" title="Notifications">
+          Notifications${logged ? '<span class="badge">0</span>' : ''}
+        </button>
+
+        <a href="${recruitmentHref}" class="btn btn-outline btn-sm">Job Recruitment</a>
+
+        ${logged ? `
+          <a href="/chat.html" class="btn btn-outline btn-sm">Messages</a>
+          <a href="/dashboard.html" class="btn btn-outline btn-sm">Dashboard</a>
+          ${user && user.role === 'admin' ? '<a href="/admin.html" class="btn btn-gold btn-sm">Admin</a>' : ''}
+          <button class="btn btn-primary btn-sm" id="logoutBtn">Sign out</button>
+        ` : `
+          <a href="/signin.html" class="btn btn-ghost btn-sm">Sign in</a>
+          <a href="/signup.html" class="btn btn-gold btn-sm">Sign up</a>
+        `}
+
+        <button class="icon-btn hamburger" id="hamburger">Menu</button>
+      </div>
+    </div>
+  `;
+
+  Theme.updateToggle();
+
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) themeToggle.addEventListener('click', Theme.toggle);
+
+  const searchInput = document.getElementById('navSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        window.location.href = `/search.html?q=${encodeURIComponent(searchInput.value)}`;
+      }
+    });
+  }
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      Auth.logout();
+      Toast.show('Signed out');
+    });
+  }
+
+  const hamburger = document.getElementById('hamburger');
+  if (hamburger) {
+    hamburger.addEventListener('click', () => {
+      document.body.classList.toggle('nav-open');
+    });
+  }
+
+  if (logged && typeof loadNotifications === 'function') {
     loadNotifications();
   }
 }
