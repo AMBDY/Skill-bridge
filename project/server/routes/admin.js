@@ -121,7 +121,12 @@ router.delete('/slides/:id', async (req, res) => {
 // Site content
 router.get('/site-content', async (req, res) => {
   const c = authedClient(req);
-  const { data, error } = await c.from('site_content').select('*').order('created_at', { ascending: false });
+
+  const { data, error } = await c
+    .from('site_content')
+    .select('*')
+    .order('created_at', { ascending: false });
+
   if (error) return res.status(400).json({ error: error.message });
   res.json(data || []);
 });
