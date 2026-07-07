@@ -534,7 +534,22 @@ router.get('/settings', async (req, res) => {
 
 router.put('/settings', async (req, res) => {
   const c = authedClient(req);
-  const { data, error } = await c.from('platform_settings').update(req.body).select().single();
+
+  const { data: existing } = await c.from('platform_settings').select('id').limit(1).maybeSingle();
+
+  if (!existing) {
+    const { data, error } = await c.from('platform_settings').insert(req.body).select().single();
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json(data);
+  }
+
+  const { data, error } = await c
+    .from('platform_settings')
+    .update(req.body)
+    .eq('id', existing.id)
+    .select()
+    .single();
+
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
