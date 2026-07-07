@@ -97,28 +97,28 @@ router.post('/products', authMiddleware, async (req, res) => {
     stock
   } = req.body;
 
-  const cleanPrice = price === '' || price === undefined || price === null ? 0 : Number(price);
-  const cleanStock = stock === '' || stock === undefined || stock === null ? 1 : Number(stock);
+  if (!title || !category_id) {
+    return res.status(400).json({ error: 'Product title and category are required.' });
+  }
 
   const { data, error } = await c.from('products').insert({
     user_id: req.user.id,
     category_id,
     title,
-    description,
-    price: cleanPrice,
+    description: description || null,
+    price: price === '' || price === undefined || price === null ? 0 : Number(price),
     size: size || null,
     color: color || null,
     gender: gender || null,
     images: Array.isArray(images) ? images : [],
     video_url: video_url || null,
-    stock: cleanStock,
+    stock: stock === '' || stock === undefined || stock === null ? 1 : Number(stock),
     status: 'paused'
   }).select().single();
 
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
-
 // Single service/product
 router.get('/listing/:type/:id', async (req, res) => {
   const { type, id } = req.params;
