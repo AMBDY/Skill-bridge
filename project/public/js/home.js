@@ -143,6 +143,34 @@ async function renderTestimonials() {
   if (host) { host.innerHTML = Social.testimonialForm(); Social.bindTestimonialForm(); }
 }
 
+async function renderCmsFeaturedItems() {
+  const target = document.getElementById('featuredItems');
+  if (!target) return;
+
+  const items = await API.get('/marketplace/cms/featured?placement=home').catch(() => []);
+
+  if (!items.length) {
+    target.innerHTML = '';
+    return;
+  }
+
+  target.innerHTML = items.map(item => `
+    <div class="card">
+      ${item.image_url ? `
+        <div class="card-img">
+          <img src="${item.image_url}" alt="${item.title || 'Featured item'}">
+        </div>
+      ` : ''}
+
+      <div class="card-body">
+        <div class="card-title">${item.title || 'Featured Item'}</div>
+        <p style="color:var(--text-soft);font-size:0.9rem">${item.subtitle || ''}</p>
+        ${item.link_url ? `<a href="${item.link_url}" class="btn btn-outline btn-sm" style="margin-top:10px">Open</a>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
 function renderWOTD() {
   const w = WOTD[Math.floor(Date.now() / 86400000) % WOTD.length];
   document.getElementById('wotdWord').textContent = w.word;
@@ -156,6 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderRecentJobs();
   renderTestimonials();
   renderWOTD();
+  renderCmsFeaturedItems();
   document.getElementById('submitSuggestion').addEventListener('click', () => {
     const v = document.getElementById('suggestionBox').value.trim();
     if (!v) return Toast.show('Please enter your feedback');
