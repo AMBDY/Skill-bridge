@@ -345,14 +345,22 @@ router.get('/cms/featured', async (req, res) => {
 
 router.post('/testimonials', authMiddleware, async (req, res) => {
   const c = authedClient(req);
-  const { name, role, text, image_url } = req.body;
+  const { name, role, text, message, image_url, rating } = req.body;
+
+  const finalText = text || message;
+
+  if (!finalText) {
+    return res.status(400).json({ error: 'Testimonial text is required.' });
+  }
 
   const { data, error } = await c.from('testimonials').insert({
     user_id: req.user.id,
-    name,
-    role,
-    text,
+    name: name || req.user.display_name || 'Member',
+    role: role || req.user.role || 'Member',
+    text: finalText,
+    message: finalText,
     image_url: image_url || null,
+    rating: rating ? Number(rating) : 5,
     status: 'pending'
   }).select().single();
 
